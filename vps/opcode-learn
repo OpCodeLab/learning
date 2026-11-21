@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Admin command line (installed to /usr/local/bin/opcode-learn). Run with sudo, e.g.
+#   sudo opcode-learn create-admin you@example.com
+set -euo pipefail
+[[ $EUID -eq 0 ]] || { echo "run with sudo" >&2; exit 1; }
+set -a; . /etc/opcode-learn/learn.env; set +a
+cd /opt/opcode-learn/app
+exec setpriv --reuid=learn --regid=learn --init-groups /opt/opcode-learn/venv/bin/python -m learn.cli "$@"

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ st.email }} · {{ site_name }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/admin">Students</a> › {{ st.email }}</p>
+<h1>{{ st.email }}
+  {% if st.disabled %}<span class="chip expired">disabled</span>{% elif st.pw_hash is none %}<span class="chip">invite pending</span>{% else %}<span class="chip okc">active</span>{% endif %}
+</h1>
+{% if msg %}<p class="ok">{{ msg }}</p>{% endif %}
+{% if link %}
+<div class="card form">
+  <h3>New access link</h3>
+  <p class="muted small">Send it to the student. It lets them set a new password, works once, expires in {{ days }} days,
+     and is shown only now. Their old sessions were signed out.</p>
+  <input class="mono" id="link" value="{{ link }}" readonly>
+  <button class="primary" id="copy" data-target="link">Copy link</button>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Courses</h2>
+  {% if enrollments %}
+  <table>
+    <thead><tr><th>Course</th><th>Progress</th><th>Access until</th><th></th></tr></thead>
+    <tbody>
+    {% for e in enrollments %}{% set p = progress.get(e.course) %}
+    <tr>
+      <td>{{ p.title if p else e.course }}</td>
+      <td>{% if p %}<progress class="bar" value="{{ p.pct }}" max="100"></progress><span class="small muted">{{ p.done }}/{{ p.total }}</span>{% else %}<span class="muted small">course not found</span>{% endif %}</td>
+      <td>
+        <form method="post" class="row">
+          <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="enroll">
+          <input type="hidden" name="course" value="{{ e.course }}">
+          <input type="date" name="expires" value="{{ e.expires_at|isodate }}">
+          <button>Save</button>
+          {% if e.expires_at and e.expires_at < now %}<span class="chip expired">expired</span>{% endif %}
+        </form>
+      </td>
+      <td>
+        <form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="unenroll">
+          <input type="hidden" name="course" value="{{ e.course }}"><button class="danger">Remove</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No course yet.</p>{% endif %}
+  {% set free = courses|reject('in', enrollments|map(attribute='course')|list)|list %}
+  {% if free %}
+  <form method="post" class="row add">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="enroll">
+    <select name="course">{% for n in free %}<option>{{ n }}</option>{% endfor %}</select>
+    <label class="small">until <input type="date" name="expires" value="{{ expiry }}"></label>
+    <button class="primary">Add course</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Account</h2>
+  <form method="post" class="row">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="name">
+    <label>Name <input name="name" value="{{ st.name }}"></label><button>Save</button>
+  </form>
+  <p class="muted small">Created {{ st.created_at|date }} · last sign-in {{ st.last_login|date if st.last_login else 'never' }}</p>
+  <div class="row">
+    <form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="invite">
+      <button>{{ 'New invite link' if st.pw_hash is none else 'Password reset link' }}</button></form>
+    {% if st.disabled %}
+    <form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="enable"><button>Enable account</button></form>
+    {% else %}
+    <form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="disable"><button class="danger">Disable account</button></form>
+    {% endif %}
+  </div>
+  <details class="danger-zone">
+    <summary>Delete this account</summary>
+    <form method="post" class="row">
+      <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="delete">
+      <input name="confirm" placeholder="type {{ st.email }}" required>
+      <button class="danger">Delete for good</button>
+    </form>
+    <p class="muted small">Removes the account, its course access and its progress. Course files are not touched.</p>
+  </details>
+</div>
+<script src="/static/admin.js?v=1"></script>
+{% endblock %}

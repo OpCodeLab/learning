@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Code · {{ site_name }}{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<form method="post" action="/login/code" class="card form">
+  <h1>Authenticator code</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <label>6-digit code<input name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" autocomplete="one-time-code" required autofocus></label>
+  <button class="primary">Continue</button>
+</form>
+{% endblock %}

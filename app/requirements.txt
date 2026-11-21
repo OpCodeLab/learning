@@ -1,0 +1,12 @@
+# Pinned; installed into /opt/opcode-learn/venv by vps/install.sh.
+starlette==1.10.0
+anyio==4.16.0
+idna==3.20
+typing_extensions==4.16.0
+uvicorn==0.54.0
+click==8.5.1
+h11==0.16.0
+Jinja2==3.1.6
+MarkupSafe==3.0.4
+python-multipart==0.0.34
+PyYAML==6.0.4

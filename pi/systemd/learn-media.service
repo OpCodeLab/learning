@@ -1,0 +1,41 @@
+[Unit]
+Description=OpCode Learn media server (read-only course files for the VPS)
+After=network-online.target wg-quick@wg0.service learn-media-firewall.service srv-drive-data.mount
+Wants=network-online.target
+Requires=learn-media-firewall.service
+
+[Service]
+User=learnmedia
+Group=drive
+ExecStart=/usr/bin/python3 /opt/learn-media/media_server.py --root /srv/drive/data/Training_Opcode --mount /srv/drive/data --bind 10.8.3.3 --port 8092
+# 10.8.3.3 only exists once wg0 is up: retry instead of giving up.
+Restart=always
+RestartSec=10
+Nice=10
+CPUWeight=50
+IOWeight=50
+MemoryMax=200M
+
+# Sandbox: the whole system is read-only for this service, the disk included.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ course.title }} · {{ site_name }}{% endblock %}
+{% block content %}
+<section class="course-head card">
+  <div>
+    <h1>{{ course.title }}</h1>
+    {% if course.description %}<p class="desc">{{ course.description }}</p>{% endif %}
+    <progress class="bar" value="{{ pct }}" max="100"></progress>
+    <p class="muted small">{{ done }} / {{ total }} lessons done · {{ pct }}%</p>
+  </div>
+  {% if resume %}
+  <a class="button primary" href="/course/{{ course.slug }}/{{ resume.id }}">{{ "Continue" if done else "Start" }}: {{ resume.title }}</a>
+  {% endif %}
+</section>
+
+{% for s in course.sections %}
+<section class="card section">
+  <h2>{{ s.title }}</h2>
+  <ol class="lessons">
+    {% for l in s.lessons %}
+    {% set p = pm.get(l.file.path) %}
+    <li class="{{ 'done' if p and p.completed else '' }}">
+      <a href="/course/{{ course.slug }}/{{ l.id }}">
+        <span class="tick" aria-hidden="true"></span>
+        <span class="t">{{ l.title }}</span>
+        {% if l.attachments %}<span class="muted small">{{ l.attachments|length }} file{{ 's' if l.attachments|length > 1 }}</span>{% endif %}
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if s.resources %}
+  <div class="files">
+    <h3>Resources</h3>
+    {% for f in s.resources %}<a class="file" href="/media/{{ course.slug }}/{{ f.id }}">{{ f.name }} <span class="muted small">{{ f.size|size }}</span></a>{% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

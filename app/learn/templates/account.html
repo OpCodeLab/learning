@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Account · {{ site_name }}{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<form method="post" class="card form">
+  <h1>Account</h1>
+  <p class="muted">{{ user.email }}</p>
+  {% if saved %}<p class="ok">Password changed. Other devices were signed out.</p>{% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <input type="hidden" name="csrf" value="{{ session.csrf }}">
+  <input type="email" name="email" value="{{ user.email }}" autocomplete="username" hidden>
+  <label>Current password<input type="password" name="current" autocomplete="current-password" required></label>
+  <label>New password<input type="password" name="password" minlength="10" autocomplete="new-password" required></label>
+  <label>Repeat new password<input type="password" name="password2" minlength="10" autocomplete="new-password" required></label>
+  <button class="primary">Change password</button>
+</form>
+{% endblock %}

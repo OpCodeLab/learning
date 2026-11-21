@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}New student · {{ site_name }}{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<form method="post" class="card form">
+  <h1>New student</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <input type="hidden" name="csrf" value="{{ session.csrf }}">
+  <label>Email<input type="email" name="email" value="{{ email or '' }}" required autofocus></label>
+  <label>Name <span class="muted small">(optional)</span><input name="name" value="{{ name or '' }}"></label>
+  <fieldset>
+    <legend>Courses</legend>
+    {% for n in courses %}
+    <label class="check"><input type="checkbox" name="course" value="{{ n }}" {{ 'checked' if chosen and n in chosen }}> {{ n }}</label>
+    {% else %}<p class="muted">No course yet: add a course.yaml to a folder in DATA/Training_Opcode.</p>{% endfor %}
+  </fieldset>
+  <label>Access until <span class="muted small">(empty = no end date)</span><input type="date" name="expires" value="{{ expiry }}"></label>
+  <button class="primary">Create and get the invite link</button>
+</form>
+{% endblock %}

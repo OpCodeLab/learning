@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ lesson.title }} · {{ course.title }}{% endblock %}
+{% block mainclass %}wide{% endblock %}
+{% block content %}
+<div class="player-layout">
+  <div class="player-main">
+    <p class="crumbs"><a href="/course/{{ course.slug }}">{{ course.title }}</a> › {{ lesson.section }}</p>
+    <video id="player" controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture
+           src="/media/{{ course.slug }}/{{ lesson.id }}"
+           data-course="{{ course.slug }}" data-lesson="{{ lesson.id }}" data-start="{{ start }}"
+           data-csrf="{{ session.csrf }}" data-next="{{ '/course/%s/%s' % (course.slug, next.id) if next else '' }}"></video>
+    <h1>{{ lesson.title }}</h1>
+    <div class="nav-row">
+      {% if prev %}<a class="button" href="/course/{{ course.slug }}/{{ prev.id }}">‹ Previous</a>{% else %}<span></span>{% endif %}
+      <label class="small muted"><input type="checkbox" id="autonext" checked> Play next automatically</label>
+      {% if next %}<a class="button primary" href="/course/{{ course.slug }}/{{ next.id }}">Next ›</a>{% endif %}
+    </div>
+    {% if lesson.attachments %}
+    <div class="card files">
+      <h3>Files for this lesson</h3>
+      {% for f in lesson.attachments %}<a class="file" href="/media/{{ course.slug }}/{{ f.id }}">{{ f.name }} <span class="muted small">{{ f.size|size }}</span></a>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <aside class="card outline">
+    <p class="small muted">{{ pct }}% of the course done</p>
+    <progress class="bar" value="{{ pct }}" max="100"></progress>
+    {% for s in course.sections %}{% if s.lessons %}
+    <h3>{{ s.title }}</h3>
+    <ol class="lessons compact">
+      {% for l in s.lessons %}{% set p = pm.get(l.file.path) %}
+      <li class="{{ 'done' if p and p.completed else '' }} {{ 'current' if l.id == lesson.id else '' }}">
+        <a href="/course/{{ course.slug }}/{{ l.id }}"><span class="tick" aria-hidden="true"></span><span class="t">{{ l.title }}</span></a>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}{% endfor %}
+  </aside>
+</div>
+<script src="/static/player.js?v=1"></script>
+{% endblock %}

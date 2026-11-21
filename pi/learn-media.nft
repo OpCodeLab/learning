@@ -1,0 +1,13 @@
+# Installed to /etc/learn-media/learn-media.nft; loaded by learn-media-firewall.service.
+# Own table: the lab's and pi_drive's rules are untouched.
+table inet learn_media
+delete table inet learn_media
+
+table inet learn_media {
+    chain input {
+        type filter hook input priority filter - 10; policy accept;
+        iif "lo" accept
+        tcp dport 8092 ip saddr 10.8.3.1 accept
+        tcp dport 8092 drop
+    }
+}

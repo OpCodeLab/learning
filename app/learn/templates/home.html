@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>My courses</h1>
+{% if not cards %}
+<div class="card empty">
+  <p>No course here yet.</p>
+  <p class="muted">Once your trainer opens a course for you, it will show up on this page.</p>
+</div>
+{% else %}
+<div class="grid">
+  {% for c in cards %}
+  <a class="course-card" href="/course/{{ c.course.slug }}">
+    <div class="cover">
+      {% if c.course.cover %}<img src="/media/{{ c.course.slug }}/{{ c.course.cover.id }}" alt="">
+      {% else %}<span>{{ c.course.title[:1] }}</span>{% endif %}
+    </div>
+    <div class="body">
+      <h2>{{ c.course.title }}</h2>
+      <progress class="bar" value="{{ c.pct }}" max="100"></progress>
+      <p class="muted small">{{ c.done }} / {{ c.total }} lessons · {{ c.pct }}%
+        {% if c.expires %}· access until {{ c.expires|date }}{% endif %}</p>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

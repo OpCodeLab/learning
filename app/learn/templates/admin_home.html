@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Students · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Students</h1>
+  <a class="button primary" href="/admin/new">+ New student</a>
+</div>
+{% if courses is none %}<p class="error">The Pi can't be reached: course names may be missing below.</p>{% endif %}
+{% if not rows %}
+<div class="card empty"><p>No students yet.</p></div>
+{% else %}
+<div class="card table-wrap">
+<table>
+  <thead><tr><th>Student</th><th>Courses (access until)</th><th>Status</th><th>Last sign-in</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td><a href="/admin/user/{{ r.user.id }}">{{ r.user.email }}</a>{% if r.user.name %}<br><span class="muted small">{{ r.user.name }}</span>{% endif %}</td>
+    <td>{% for e in r.enrollments %}
+        <span class="chip {{ 'expired' if e.expires_at and e.expires_at < now else '' }}">{{ e.course }}{% if e.expires_at %} · {{ e.expires_at|date }}{% endif %}</span>
+        {% else %}<span class="muted">none</span>{% endfor %}</td>
+    <td>{% if r.user.disabled %}<span class="chip expired">disabled</span>
+        {% elif r.invited %}<span class="chip">invite pending</span>
+        {% else %}<span class="chip okc">active</span>{% endif %}</td>
+    <td class="muted small">{{ r.user.last_login|date if r.user.last_login else 'never' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Courses · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Courses</h1>
+  <a class="button" href="/admin/courses?refresh=1">Re-read the disk</a>
+</div>
+<p class="muted">Courses are the folders in <span class="mono">DATA/Training_Opcode</span> that contain a
+  <span class="mono">course.yaml</span>. Upload with files.opcode-labs.com; the site re-reads the folders every minute.</p>
+{% if offline %}<p class="error">The Pi can't be reached: {{ offline }}</p>{% endif %}
+
+{% for c in courses %}
+<div class="card">
+  <div class="head-row">
+    <h2>{{ c.title }} <span class="muted small mono">{{ c.slug }}</span></h2>
+    <span class="muted small">{{ c.lessons|length }} lessons · {{ counts.get(c.slug, 0) }} students with access</span>
+  </div>
+  {% for w in c.warnings %}<p class="warn">⚠ {{ w }}</p>{% endfor %}
+  {% for s in c.sections %}
+  <details>
+    <summary>{{ s.title }} <span class="muted small">{{ s.lessons|length }} videos{% if s.resources %}, {{ s.resources|length }} resources{% endif %}</span></summary>
+    <ol class="lessons compact">
+      {% for l in s.lessons %}<li><a href="/course/{{ c.slug }}/{{ l.id }}"><span class="t">{{ l.title }}</span></a>
+        <span class="muted small">{{ l.file.size|size }}{% if l.attachments %} · {{ l.attachments|map(attribute='name')|join(', ') }}{% endif %}</span></li>{% endfor %}
+    </ol>
+  </details>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% set others = folders|rejectattr('course')|list %}
+{% if others %}
+<div class="card">
+  <h2>Other folders (not published)</h2>
+  <p class="muted small">Add a <span class="mono">course.yaml</span> to make one a course.</p>
+  <p>{% for f in others %}<span class="chip mono">{{ f.name }}</span> {% endfor %}</p>
+</div>
+{% endif %}
+{% endblock %}

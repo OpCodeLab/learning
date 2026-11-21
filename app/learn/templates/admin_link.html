@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Invite link · {{ site_name }}{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<div class="card form">
+  <h1>Invite link for {{ student }}</h1>
+  <p class="muted">Send this link to the student yourself (email, WhatsApp…). They choose their password with it.
+     It works once and expires in {{ days }} days. It is shown only now.</p>
+  <input class="mono" id="link" value="{{ link }}" readonly>
+  <button class="primary" id="copy" data-target="link">Copy link</button>
+  <p><a href="/admin/user/{{ uid }}">Open the student's page</a> · <a href="/admin">All students</a></p>
+</div>
+<script src="/static/admin.js?v=1"></script>
+{% endblock %}

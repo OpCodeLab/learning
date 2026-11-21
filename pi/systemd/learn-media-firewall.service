@@ -1,0 +1,12 @@
+[Unit]
+Description=OpCode Learn firewall (port 8092 only from the VPS 10.8.3.1)
+Before=learn-media.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/learn-media/learn-media.nft
+ExecStop=/usr/sbin/nft delete table inet learn_media
+
+[Install]
+WantedBy=multi-user.target

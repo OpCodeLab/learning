@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Welcome · {{ site_name }}{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<form method="post" class="card form">
+  <h1>Welcome{% if student.name %}, {{ student.name }}{% endif %}</h1>
+  <p class="muted">Choose a password for <strong>{{ student.email }}</strong>. You'll use it with this email to sign in.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <input type="email" name="email" value="{{ student.email }}" autocomplete="username" hidden>
+  <label>New password<input type="password" name="password" minlength="10" autocomplete="new-password" required autofocus></label>
+  <label>Repeat it<input type="password" name="password2" minlength="10" autocomplete="new-password" required></label>
+  <button class="primary">Save and start</button>
+</form>
+{% endblock %}
