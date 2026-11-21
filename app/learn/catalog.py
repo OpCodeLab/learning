@@ -153,7 +153,10 @@ def build(slug, meta, files):
     sections = []
     for folder in sorted(folders, key=natural_key):
         items = sorted(folders[folder], key=lambda f: natural_key(f.name))
-        title = split_title(folder)[1] if folder else "Lessons"
+        if folder:
+            title = split_title(folder)[1]
+        else:  # files lying in the course folder itself
+            title = "Lessons" if any(f.ext in VIDEO_EXT for f in items) else "Course files"
         sec = Section(title=title)
         videos = [f for f in items if f.ext in VIDEO_EXT]
         others = [f for f in items if f.ext not in VIDEO_EXT]
