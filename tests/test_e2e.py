@@ -32,6 +32,7 @@ make("linux_udemy/01 Getting started/02 - Install Ubuntu.mp4", VIDEO[:1000])
 make("linux_udemy/01 Getting started/cheatsheet.txt", b"ls cd pwd")
 make("linux_udemy/02 Shell/10 Pipes.mp4", VIDEO[:2000])
 make("linux_udemy/02 Shell/9 Redirection.mkv", b"x")
+make("linux_udemy/02 Shell/upload-chunk-123.tmp", b"x")
 make("linux_udemy/$RECYCLE.BIN/secret.mp4", b"x")
 make("rtos_record/course.yaml", b"title: RTOS\n")
 make("rtos_record/01 Intro.mp4", VIDEO[:500])
@@ -54,6 +55,7 @@ from starlette.testclient import TestClient  # noqa: E402
 from learn import security, store, web  # noqa: E402
 
 ok = True
+from learn.catalog import split_title  # noqa: E402
 
 
 def check(name, cond, extra=""):
@@ -71,6 +73,12 @@ def csrf_of(html):
 
 
 try:
+    # --- title parsing ------------------------------------------------------------
+    check("title: 'S3_L11_Why-multithreading-Amdahl-s-law.mp4'",
+          split_title("S3_L11_Why-multithreading-Amdahl-s-law.mp4") == (11, "Why multithreading Amdahl's law"))
+    check("title: '02 - Install Ubuntu.mp4'", split_title("02 - Install Ubuntu.mp4") == (2, "Install Ubuntu"))
+    check("title: section folder kept", split_title("Section 1 - Linux basics") == (None, "Section 1 - Linux basics"))
+
     # --- media server on its own ------------------------------------------------
     import json
     raw = lambda p, **h: urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:%d%s" % (PORT, p), headers=h))
@@ -141,6 +149,7 @@ try:
     check("course page: sections, titles without numbers", "Getting started" in r.text and "Install Ubuntu" in r.text
           and "Pipes" in r.text and "cheatsheet.txt" in r.text)
     check("unplayable .mkv hidden from students", "Redirection" not in r.text)
+    check("unfinished uploads (.tmp) hidden", "upload-chunk" not in r.text)
     lids = list(dict.fromkeys(re.findall(r'href="/course/linux_udemy/([0-9a-f]{12})"', r.text)))
     first = lids[0]
     r = st.get("/course/linux_udemy/" + first)

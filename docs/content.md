@@ -25,6 +25,9 @@ DATA/Training_Opcode/
 
 - **Order** comes from the leading numbers (`01`, `02`, … `10` sorts after `9`). The numbers
   and separators (`01 `, `01 - `, `01_`, `01.`) are hidden in titles.
+- The Udemy-style names `S1_L01_fork-and-wait.mp4` work too: the lesson number is 1, and the
+  title becomes "fork and wait". In names without spaces, `-` and `_` become spaces and `-s` becomes `'s`.
+- Hidden too: unfinished uploads (`.tmp`, `.part`), which appear once the upload completes.
 - **Sections** are the sub-folders. Videos directly in the course folder form one section, "Lessons".
 - **Attachments**: any non-video file whose number matches a lesson in the same folder
   (`02 pipes-lab.zip` → lesson `02 …`). Files without a matching number are section resources.
@@ -40,6 +43,22 @@ description: |
 ```
 Both keys are optional (without `title`, the folder name is used). Create the file in
 files.opcode-labs.com with *New file*, or upload it.
+
+To set a nicer title for some lessons, add `titles:` with the file name (with or without `.mp4`):
+```yaml
+titles:
+  S1_L01_fork-and-wait-parent-and-child-processes: "fork() and wait(): parent and child processes"
+  S4_L27_I-O-buffering-stdio-vs-kernel-buffer-cache: "I/O buffering: stdio vs the kernel buffer cache"
+```
+Put titles containing `:` in quotes.
+
+## Check the videos
+On the Pi (read-only, takes a minute for a big course):
+```bash
+bash ~/opcode_learn/tools/check-videos.sh /srv/drive/data/Training_Opcode/linux_udemy
+```
+For each video it prints `OK`, or why not: `BROKEN` (an unfinished or damaged upload: upload it again), the
+wrong codec, an index at the end of the file (slow start), or a bitrate too high for the home uplink.
 
 ## Video format
 Browsers play **MP4 with H.264 video and AAC audio**. Most screen recorders (OBS, Camtasia,

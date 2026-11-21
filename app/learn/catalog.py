@@ -28,7 +28,9 @@ from . import config
 VIDEO_EXT = {".mp4", ".m4v", ".webm"}
 PLAYABLE_WARN_EXT = {".mkv", ".avi", ".mov", ".wmv", ".flv", ".ts"}
 COVER_NAMES = {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}
-_NUM = re.compile(r"^\s*(\d+)[\s._\-)]*")
+PARTIAL_EXT = {".tmp", ".part", ".crdownload", ".partial"}   # uploads still in progress
+# "03 - Title", "03_Title", and "S1_L03_Title" (section 1, lesson 3): the lesson number is 3.
+_NUM = re.compile(r"^\s*(?:S\d+[\s._-]*L)?(\d+)[\s._\-)]*", re.I)
 
 
 class Unavailable(Exception):
@@ -111,24 +113,33 @@ def natural_key(s):
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)]
 
 
+def tidy(text):
+    """'Why-multithreading-Amdahl-s-law' -> 'Why multithreading Amdahl's law' (names without spaces only)."""
+    if " " in text or not re.search(r"[-_]", text):
+        return text
+    text = re.sub(r"(?<=[A-Za-z])-s(?=-|$)", "'s", text)
+    return re.sub(r"[-_]+", " ", text).strip()
+
+
 def split_title(name):
-    """'03 - File permissions.mp4' -> (3, 'File permissions')"""
+    """'03 - File permissions.mp4' -> (3, 'File permissions'); 'S1_L03_fork-and-wait.mp4' -> (3, 'fork and wait')"""
     stem = name.rsplit(".", 1)[0] if "." in name else name
     m = _NUM.match(stem)
     if not m:
-        return None, stem.strip()
+        return None, tidy(stem.strip())
     rest = stem[m.end():].strip()
-    return int(m.group(1)), rest or stem.strip()
+    return int(m.group(1)), tidy(rest) if rest else stem.strip()
 
 
 def build(slug, meta, files):
     """Turn a flat file list (from /tree) into a Course."""
     files = [File(f["path"], f["size"], f["mtime"]) for f in files]
     warnings = []
+    titles = meta.get("titles") if isinstance(meta.get("titles"), dict) else {}
     cover = next((f for f in files if "/" not in f.path and f.name.lower() in COVER_NAMES), None)
     folders = {}
     for f in files:
-        if f.path == "course.yaml" or f is cover:
+        if f.path == "course.yaml" or f is cover or f.ext in PARTIAL_EXT:
             continue
         if f.ext in PLAYABLE_WARN_EXT:
             warnings.append("%s: browsers can't play %s; convert it to .mp4 (see docs/content.md)" % (f.path, f.ext))
@@ -149,6 +160,8 @@ def build(slug, meta, files):
         by_num = {}
         for v in videos:
             num, t = split_title(v.name)
+            # course.yaml "titles:" overrides, keyed by file name (with or without extension)
+            t = str(titles.get(v.name) or titles.get(v.name.rsplit(".", 1)[0]) or t)
             les = Lesson(file=v, title=t, number=num, section=title)
             sec.lessons.append(les)
             if num is not None:
