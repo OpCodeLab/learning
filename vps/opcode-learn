@@ -3,6 +3,9 @@
 #   sudo opcode-learn create-admin you@example.com
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "run with sudo" >&2; exit 1; }
-set -a; . /etc/opcode-learn/learn.env; set +a
+# Read learn.env the way systemd does (KEY=value, value may contain spaces), not with "source".
+while IFS='=' read -r key value; do
+    if [[ $key =~ ^[A-Z_][A-Z0-9_]*$ ]]; then export "$key=$value"; fi
+done < /etc/opcode-learn/learn.env
 cd /opt/opcode-learn/app
 exec setpriv --reuid=learn --regid=learn --init-groups /opt/opcode-learn/venv/bin/python -m learn.cli "$@"
