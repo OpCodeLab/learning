@@ -13,7 +13,8 @@ die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || die "run with sudo"
 
 step "Checks"
-ip=$(getent hosts "$DOMAIN" | awk '{print $1}' | head -1)
+# "|| true": with pipefail a failed lookup would end the script silently instead of via die.
+ip=$(getent hosts "$DOMAIN" | awk '{print $1}' | head -1 || true)
 [[ -n $ip ]] || die "$DOMAIN has no DNS record yet (A record -> this VPS)"
 echo "$DOMAIN -> $ip"
 curl -s --max-time 5 http://10.8.3.3:8092/list >/dev/null \
