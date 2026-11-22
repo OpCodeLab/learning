@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -74,7 +75,8 @@ import kotlin.random.Random
  */
 @OptIn(UnstableApi::class)
 @Composable
-fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Unit, onSignedOut: (String?) -> Unit) {
+fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Unit, onInfo: () -> Unit,
+                 onSignedOut: (String?) -> Unit) {
     val ctx = LocalContext.current
     val activity = ctx as Activity
     val scope = rememberCoroutineScope()
@@ -114,7 +116,7 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
             MediaItem.Builder().setUri(api.mediaUrl(slug, l.id)).setMediaId(l.id)
                 .setMediaMetadata(MediaMetadata.Builder().setTitle(l.title).build()).build()
         }
-        val start = lessons.indexOfFirst { it.id == startLessonId }.coerceAtLeast(0)
+        val start = lessons.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
         val pos = lessons.getOrNull(start)?.position ?: 0.0
         player.setMediaItems(items, start, (if (pos > 5) pos * 1000 else 0.0).toLong())
         player.prepare()
@@ -137,6 +139,7 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
     LaunchedEffect(slug) {
         try {
             val c = api.course(slug)
+            if (currentId == "resume") currentId = c.resume ?: c.allLessons.firstOrNull()?.id ?: ""
             course = c
             val other = api.playStatus().elsewhere
             if (other != null) elsewhere = other else attach(c)
@@ -234,6 +237,9 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
                 IconButton(onBack, Modifier.align(Alignment.TopStart)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
                 }
+                IconButton(onInfo, Modifier.align(Alignment.TopEnd)) {
+                    Icon(Icons.Outlined.Info, "About this course", tint = Color.White)
+                }
             }
             if (c == null) { Loading(); return@Column }
             val lesson = c.allLessons.firstOrNull { it.id == currentId }
@@ -243,7 +249,10 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(c.sectionOf(currentId)?.title ?: "", style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(lesson?.title ?: "", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(lesson?.let { "${it.number ?: (it.index + 1)}. ${it.title}" } ?: "",
+                            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(c.title + (totalLength(c.length ?: 0.0)?.let { " · $it" } ?: "") + " · ${c.done} / ${c.lessons} done",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
                 }
@@ -252,8 +261,15 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
                 }
                 item { HorizontalDivider() }
                 c.sections.forEach { s ->
-                    item { Text(s.title, Modifier.padding(start = 16.dp, top = 14.dp, bottom = 4.dp),
-                        style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
+                    item {
+                        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)) {
+                            Text(s.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            val len = totalLength(s.lessons.sumOf { it.length ?: 0.0 })
+                            Text("${s.lessons.count { it.completed }} / ${s.lessons.size}" + (len?.let { " · $it" } ?: ""),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                     items(s.lessons, key = { it.id }) { l ->
                         LessonRow(l, current = l.id == currentId) {
                             val i = c.allLessons.indexOfFirst { it.id == l.id }

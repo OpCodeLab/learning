@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import config
+from . import config, durations
 
 VIDEO_EXT = {".mp4", ".m4v", ".webm"}
 PLAYABLE_WARN_EXT = {".mkv", ".avi", ".mov", ".wmv", ".flv", ".ts"}
@@ -65,6 +65,13 @@ class Lesson:
     section: str
     attachments: list = field(default_factory=list)
     index: int = 0               # position in the whole course (0-based)
+    duration: float | None = None    # seconds, from the MP4 header (durations.py)
+    unreadable: bool = False         # the MP4 header couldn't be read (broken upload?)
+
+    @property
+    def num(self):
+        """Number shown to students: from the file name (S4_L21 -> 21), else the position."""
+        return self.number if self.number is not None else self.index + 1
 
     @property
     def id(self):
@@ -90,6 +97,10 @@ class Course:
     @property
     def lessons(self):
         return [l for s in self.sections for l in s.lessons]
+
+    @property
+    def total_duration(self):
+        return sum(l.duration or 0 for l in self.lessons)
 
     def lesson(self, lid):
         return next((l for l in self.lessons if l.id == lid), None)
@@ -237,9 +248,22 @@ def course(slug, refresh=False):
         c = build(slug, meta, tree["files"])
         if bad:
             c.warnings.append("course.yaml is not valid YAML (title: / description:): using the folder name")
+        try:
+            durations.apply(c, on_update=lambda: _forget("course:" + slug))
+        except Exception:   # lengths are a nice-to-have: never block the course
+            pass
+        for les in c.lessons:
+            if les.unreadable:
+                c.warnings.append("%s: the video header can't be read (upload cut short? re-upload it, "
+                                  "or run tools/check-videos.sh)" % les.file.path)
         return c
 
     return _cached("course:" + slug, load, refresh)
+
+
+def _forget(key):
+    with _lock:
+        _cache.pop(key, None)
 
 
 def refresh_all():

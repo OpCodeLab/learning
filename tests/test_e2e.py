@@ -5,6 +5,7 @@
 """
 import os
 import re
+import struct
 import subprocess
 import sys
 import tempfile
@@ -30,7 +31,11 @@ make("linux_udemy/01 Getting started/01 Welcome.mp4", VIDEO)
 make("linux_udemy/01 Getting started/01 Welcome.pdf", b"%PDF-1.4 welcome")
 make("linux_udemy/01 Getting started/02 - Install Ubuntu.mp4", VIDEO[:1000])
 make("linux_udemy/01 Getting started/cheatsheet.txt", b"ls cd pwd")
-make("linux_udemy/02 Shell/10 Pipes.mp4", VIDEO[:2000])
+# A real MP4 box layout: ftyp, a big mdat, then moov/mvhd at the end (125.0 s), as phones write it.
+MP4 = (struct.pack(">I4s", 16, b"ftyp") + b"isom\x00\x00\x00\x00" + struct.pack(">I4s", 8 + 2000, b"mdat") + VIDEO[:2000]
+       + struct.pack(">I4s", 8 + 8 + 100, b"moov") + struct.pack(">I4s", 8 + 100, b"mvhd")
+       + struct.pack(">B3xIIII", 0, 0, 0, 1000, 125000) + bytes(80))
+make("linux_udemy/02 Shell/10 Pipes.mp4", MP4)
 make("linux_udemy/02 Shell/9 Redirection.mkv", b"x")
 make("linux_udemy/02 Shell/upload-chunk-123.tmp", b"x")
 make("linux_udemy/$RECYCLE.BIN/secret.mp4", b"x")
@@ -146,11 +151,15 @@ try:
     r = st.get("/")
     check("student home shows linux only", "Linux from scratch" in r.text and "RTOS" not in r.text)
     r = st.get("/course/linux_udemy")
-    check("course page: sections, titles without numbers", "Getting started" in r.text and "Install Ubuntu" in r.text
+    check("course link goes straight to the first video", r.status_code == 303
+          and re.fullmatch(r"/course/linux_udemy/[0-9a-f]{12}", r.headers["location"]), r.headers.get("location"))
+    r = st.get(r.headers["location"])
+    check("course content: sections, titles without numbers", "Getting started" in r.text and "Install Ubuntu" in r.text
           and "Pipes" in r.text and "cheatsheet.txt" in r.text)
     check("unplayable .mkv hidden from students", "Redirection" not in r.text)
     check("unfinished uploads (.tmp) hidden", "upload-chunk" not in r.text)
-    lids = list(dict.fromkeys(re.findall(r'href="/course/linux_udemy/([0-9a-f]{12})"', r.text)))
+    check("lessons numbered like Udemy", "1. Welcome" in r.text and "10. Pipes" in r.text)
+    lids = list(dict.fromkeys(re.findall(r'<a href="/course/linux_udemy/([0-9a-f]{12})"', r.text)))
     first = lids[0]
     r = st.get("/course/linux_udemy/" + first)
     check("lesson page has player + attachment", "<video" in r.text and "01 Welcome.pdf" in r.text)
@@ -161,8 +170,7 @@ try:
     r = st.get("/media/linux_udemy/" + att.group(1))
     check("attachment download", r.content.startswith(b"%PDF") and "attachment" in r.headers["content-disposition"])
     check("student blocked from rtos course page", st.get("/course/rtos_record").status_code == 404)
-    rt = app.get("/course/rtos_record")
-    rtl = re.findall(r'href="/course/rtos_record/([0-9a-f]{12})"', rt.text)[0]
+    rtl = app.get("/course/rtos_record").headers["location"].rsplit("/", 1)[1]
     check("student blocked from rtos media", st.get("/media/rtos_record/" + rtl).status_code == 404)
     check("student blocked from admin", st.get("/admin").status_code == 404)
 
@@ -179,7 +187,31 @@ try:
     r = st.get("/")
     check("course % after one of three lessons", "1 / 3 lessons" in r.text, re.findall(r"\d+ / \d+ lessons", r.text))
     r = st.get("/course/linux_udemy")
-    check("continue button points to lesson 2", ('href="/course/linux_udemy/%s">Continue' % lids[1]) in r.text)
+    check("course link resumes at lesson 2", r.headers.get("location") == "/course/linux_udemy/" + lids[1])
+
+    # lesson lengths, read from the MP4 header in the background
+    from learn import durations
+    for _ in range(50):
+        if "▶ 2 min" in st.get("/course/linux_udemy/" + first).text:
+            break
+        time.sleep(0.1)
+    check("lesson length from the MP4 header (125 s -> 2 min)", "▶ 2 min" in st.get("/course/linux_udemy/" + first).text)
+    lens = {k.rsplit("/", 1)[1]: v[2] for k, v in durations.known("linux_udemy").items()}
+    check("length stored; garbage file marked unreadable", lens.get("10 Pipes.mp4") == 125.0
+          and "01 Welcome.mp4" in lens and lens["01 Welcome.mp4"] is None, lens)
+    check("unreadable video reported to the admin", "video header can" in app.get("/admin/courses").text)
+    check("format", durations.fmt(9 * 60 + 20) == "9 min" and durations.fmt_total(76320) == "21 h 12 min")
+
+    # ticking lessons by hand (course content checkboxes)
+    J = dict(H, **{"X-CSRF-Token": scsrf})
+    r = st.post("/api/complete", json={"course": "linux_udemy", "lesson": lids[2], "completed": True}, headers=J)
+    check("tick a lesson by hand", r.status_code == 200 and r.json()["done"] == 2, r.text)
+    r = st.post("/api/complete", json={"course": "linux_udemy", "lesson": lids[2], "completed": False}, headers=J)
+    check("untick it again", r.json()["done"] == 1, r.text)
+    check("tick without csrf refused", st.post("/api/complete", json={"course": "linux_udemy", "lesson": lids[2],
+                                                                     "completed": True}, headers=H).status_code == 403)
+    check("ticking doesn't move the resume point",
+          st.get("/course/linux_udemy").headers.get("location") == "/course/linux_udemy/" + lids[1])
     with store.db() as c:
         uid0 = store.user_by_email(c, "alice@example.com")["id"]
 

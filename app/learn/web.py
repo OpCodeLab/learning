@@ -19,7 +19,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from . import catalog, config, guard, security, store
+from . import catalog, config, durations, guard, security, store
 
 HERE = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
@@ -43,6 +43,8 @@ templates.env.filters["date"] = fmt_date
 templates.env.filters["datetime"] = lambda ts: dt.datetime.fromtimestamp(ts).strftime("%d %b %H:%M") if ts else ""
 templates.env.filters["isodate"] = lambda ts: dt.date.fromtimestamp(ts).isoformat() if ts else ""
 templates.env.filters["size"] = fmt_size
+templates.env.filters["dur"] = durations.fmt
+templates.env.filters["total"] = durations.fmt_total
 
 
 # --- login throttling (in memory; restart clears it) ------------------------------
@@ -296,6 +298,15 @@ def course_progress(c, uid, course):
     return pm, done, total, (round(100 * done / total) if total else 0)
 
 
+def resume_lesson(c, uid, course, pm):
+    """Where "Continue" goes: the last lesson watched (the next one if it was finished), else the first."""
+    last = store.last_watched(c, uid, course.slug)
+    les = next((l for l in course.lessons if last and l.file.path == last["lesson"]), None)
+    if les and pm[les.file.path]["completed"] and les.index + 1 < len(course.lessons):
+        les = course.lessons[les.index + 1]
+    return les or (course.lessons[0] if course.lessons else None)
+
+
 def unavailable(request):
     return render(request, "message.html", 503, title="Courses are offline for a moment",
                   text="The video server can't be reached right now. Please try again in a few minutes.")
@@ -334,12 +345,11 @@ async def course_page(request: Request):
         raise HTTPException(404)
     with store.db() as c:
         pm, done, total, pct = course_progress(c, u["id"], course)
-        last = store.last_watched(c, u["id"], slug)
-    resume = next((l for l in course.lessons if last and l.file.path == last["lesson"]), None)
-    if resume and pm[resume.file.path]["completed"] and resume.index + 1 < total:
-        resume = course.lessons[resume.index + 1]
+        resume = resume_lesson(c, u["id"], course, pm)
+    if resume:   # like Udemy: opening a course goes straight to the video
+        return RedirectResponse("/course/%s/%s" % (slug, resume.id), 303)
     return render(request, "course.html", user=u, session=s, course=course, pm=pm, done=done,
-                  total=total, pct=pct, resume=resume or (course.lessons[0] if course.lessons else None))
+                  total=total, pct=pct, resume=None)
 
 
 async def lesson_page(request: Request):
@@ -361,8 +371,40 @@ async def lesson_page(request: Request):
     nxt = lessons[lesson.index + 1] if lesson.index + 1 < len(lessons) else None
     p = pm.get(lesson.file.path)
     start = p["position"] if p and not p["completed"] else 0
+    done_ids = {l.id for l in lessons if pm.get(l.file.path) and pm[l.file.path]["completed"]}
+    sections = [dict(s=sec, done=sum(1 for l in sec.lessons if l.id in done_ids),
+                     length=sum(l.duration or 0 for l in sec.lessons),
+                     current=any(l.id == lesson.id for l in sec.lessons))
+                for sec in course.sections]
+    section = next((x["s"] for x in sections if x["current"]), None)
+    files = list(lesson.attachments) + list(section.resources if section else [])
     return render(request, "lesson.html", user=u, session=s, course=course, lesson=lesson, pm=pm,
-                  pct=pct, prev=prev, next=nxt, start=start)
+                  done_ids=done_ids, done=done, total=total, pct=pct, prev=prev, next=nxt, start=start,
+                  sections=sections, section=section, files=files)
+
+
+async def complete_api(request: Request):
+    """Tick or untick a lesson by hand (the checkbox in the course content list)."""
+    s, u = current(request)
+    if not u:
+        return JSONResponse({"error": "login"}, 401)
+    if not api_checked(request, s):
+        return JSONResponse({"error": "csrf"}, 403)
+    data = await request.json()
+    slug, lid = str(data.get("course", "")), str(data.get("lesson", ""))
+    if not allowed(u, slug):
+        return JSONResponse({"error": "forbidden"}, 403)
+    try:
+        course = catalog.course(slug)
+    except catalog.Unavailable:
+        return JSONResponse({"error": "offline"}, 503)
+    lesson = course.lesson(lid) if course else None
+    if not lesson:
+        return JSONResponse({"error": "unknown lesson"}, 404)
+    with store.db() as c:
+        store.set_completed(c, u["id"], slug, lesson.file.path, bool(data.get("completed")))
+        _, done, total, pct = course_progress(c, u["id"], course)
+    return JSONResponse({"ok": True, "done": done, "total": total, "pct": pct})
 
 
 async def progress_api(request: Request):
@@ -711,6 +753,7 @@ routes = [
     Route("/course/{slug}/{lid}", lesson_page),
     Route("/media/{slug}/{fid}", media, methods=["GET", "HEAD"]),
     Route("/api/progress", progress_api, methods=["POST"]),
+    Route("/api/complete", complete_api, methods=["POST"]),
     Route("/api/play", play_api, methods=["GET", "POST"]),
     Route("/admin", admin_home),
     Route("/admin/new", admin_new, methods=["GET", "POST"]),

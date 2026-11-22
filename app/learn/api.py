@@ -121,15 +121,12 @@ async def course(request: Request):
         return err("not found", 404)
     with store.db() as c:
         pm, done, total, pct = web.course_progress(c, u["id"], crs)
-        last = store.last_watched(c, u["id"], slug)
-    resume = next((l for l in crs.lessons if last and l.file.path == last["lesson"]), None)
-    if resume and pm[resume.file.path]["completed"] and resume.index + 1 < total:
-        resume = crs.lessons[resume.index + 1]
-    resume = resume or (crs.lessons[0] if crs.lessons else None)
+        resume = web.resume_lesson(c, u["id"], crs, pm)
 
     def lesson_json(l):
         p = pm.get(l.file.path)
-        return {"id": l.id, "title": l.title, "number": l.number, "index": l.index,
+        return {"id": l.id, "title": l.title, "number": l.num, "index": l.index,
+                "length": l.duration,     # seconds, from the video header (None until read)
                 "completed": bool(p and p["completed"]),
                 "position": (p["position"] if p and not p["completed"] else 0),
                 "duration": (p["duration"] if p else 0),
@@ -139,6 +136,7 @@ async def course(request: Request):
         "slug": slug, "title": crs.title, "description": crs.description,
         "cover": crs.cover.id if crs.cover else None, "done": done, "lessons": total, "pct": pct,
         "resume": resume.id if resume else None,
+        "length": crs.total_duration or None,
         "watermark": None if u["is_admin"] else u["email"],
         "sections": [{"title": sec.title, "lessons": [lesson_json(l) for l in sec.lessons],
                       "resources": [file_json(f) for f in sec.resources]} for sec in crs.sections],

@@ -62,6 +62,14 @@ CREATE TABLE IF NOT EXISTS progress (
     updated_at  INTEGER NOT NULL,
     PRIMARY KEY (user_id, course, lesson)
 );
+CREATE TABLE IF NOT EXISTS durations (         -- video lengths read from the MP4 headers
+    course      TEXT NOT NULL,
+    path        TEXT NOT NULL,
+    size        INTEGER NOT NULL,
+    mtime       INTEGER NOT NULL,
+    seconds     REAL,                       -- NULL = header unreadable
+    PRIMARY KEY (course, path)
+);
 """
 
 
@@ -159,6 +167,14 @@ def save_progress(c, uid, course, lesson, position, duration, completed):
         "position = excluded.position, duration = excluded.duration, "
         "completed = MAX(progress.completed, excluded.completed), updated_at = excluded.updated_at",
         (uid, course, lesson, position, duration, int(completed), now()))
+
+
+def set_completed(c, uid, course, lesson, completed):
+    """The student ticks or unticks a lesson by hand."""
+    c.execute(
+        "INSERT INTO progress (user_id, course, lesson, completed, updated_at) VALUES (?,?,?,?,?) "
+        "ON CONFLICT (user_id, course, lesson) DO UPDATE SET completed = excluded.completed",
+        (uid, course, lesson, int(completed), now()))
 
 
 def last_watched(c, uid, course):

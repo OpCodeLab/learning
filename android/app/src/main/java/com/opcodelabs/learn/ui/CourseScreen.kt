@@ -140,9 +140,14 @@ fun LessonRow(l: Lesson, current: Boolean, onClick: () -> Unit) {
         if (l.completed) Icon(Icons.Default.CheckCircle, "Done", tint = Ok, modifier = Modifier.size(22.dp))
         else Icon(Icons.Outlined.Circle, null, tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(12.dp))
-        Text(l.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (current) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface)
+        Column(Modifier.weight(1f)) {
+            Text("${l.number ?: (l.index + 1)}. ${l.title}", style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (current) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface)
+            lessonLength(l.length)?.let {
+                Text("▶ $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         if (l.attachments.isNotEmpty()) Icon(Icons.Default.AttachFile, "Files", Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }

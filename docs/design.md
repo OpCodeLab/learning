@@ -87,3 +87,13 @@ square corners, and a light/dark switch (`static/theme.js`, copied from the lab 
 which the CSP forbids). `static/logo.svg` is the OpCode Labs mark redrawn as vector from the lab's `opcode-mark.png`;
 the Android icon uses the same paths. The CSP allows `fonts.googleapis.com` (styles) and `fonts.gstatic.com` (fonts),
 and nothing else from outside.
+
+## Player page
+Opening a course goes straight to its video, like Udemy: `/course/<slug>` redirects to the lesson where
+the student stopped (the next one if it was finished), else the first. The course page (`course.html`)
+is only shown for a course without videos. The player page has the video edge to edge, the course
+content on the right (sections that fold, numbered lessons, lengths, tick boxes), and Overview / Files
+tabs under the video. Ticking a box (`POST /api/complete`) marks a lesson done or not done by hand; it
+doesn't move the resume point. Lengths come from `durations.py` (MP4 `moov/mvhd` header, read with Range
+requests, stored in the `durations` table). The Android app does the same: a course opens on its video,
+and the ⓘ button shows the course overview.

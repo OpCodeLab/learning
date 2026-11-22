@@ -60,6 +60,12 @@ bash ~/opcode_learn/tools/check-videos.sh /srv/drive/data/Training_Opcode/linux_
 For each video it prints `OK`, or why not: `BROKEN` (an unfinished or damaged upload: upload it again), the
 wrong codec, an index at the end of the file (slow start), or a bitrate too high for the home uplink.
 
+## Lesson lengths
+The site shows each lesson's length ("▶ 9 min") and each section's total, like Udemy. It reads them
+from the video file's header (a few KB per file, over the Pi link) the first time it sees a file, and
+again only if the file changes. New uploads get their length within a minute. A video whose header
+can't be read (usually an upload cut short) gets a warning on **Courses** (admin): re-upload it.
+
 ## Video format
 Browsers play **MP4 with H.264 video and AAC audio**. Most screen recorders (OBS, Camtasia,
 Udemy exports) already produce that. `.mkv`, `.avi`, `.mov`, … are hidden from students

@@ -48,15 +48,19 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     composable("courses") {
-                        CoursesScreen(app.api, app.session.email.orEmpty(), { slug -> nav.navigate("course/$slug") }, signedOut)
+                        CoursesScreen(app.api, app.session.email.orEmpty(), { slug -> nav.navigate("player/$slug/resume") }, signedOut)
                     }
                     composable("course/{slug}") { e ->
                         val slug = e.arguments?.getString("slug")!!
-                        CourseScreen(app.api, slug, { nav.popBackStack() }, { lid -> nav.navigate("player/$slug/$lid") }, signedOut)
+                        CourseScreen(app.api, slug, { nav.popBackStack() }, { lid ->
+                            nav.navigate("player/$slug/$lid") { popUpTo("courses") }
+                        }, signedOut)
                     }
+                    // Like Udemy, a course opens on its video ("resume" = where the student stopped).
                     composable("player/{slug}/{lid}") { e ->
-                        PlayerScreen(app.api, e.arguments?.getString("slug")!!, e.arguments?.getString("lid")!!,
-                            { nav.popBackStack() }, signedOut)
+                        val slug = e.arguments?.getString("slug")!!
+                        PlayerScreen(app.api, slug, e.arguments?.getString("lid")!!,
+                            { nav.popBackStack() }, { nav.navigate("course/$slug") }, signedOut)
                     }
                 }
             }

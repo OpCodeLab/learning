@@ -55,6 +55,17 @@ fun Cover(api: Api, slug: String, coverId: String?, title: String, modifier: Mod
     }
 }
 
+/** Lesson length like Udemy: "9 min". */
+fun lessonLength(seconds: Double?): String? =
+    seconds?.takeIf { it > 0 }?.let { "${maxOf(1, Math.round(it / 60).toInt())} min" }
+
+/** "21 h 12 min", "45 min". */
+fun totalLength(seconds: Double): String? {
+    if (seconds <= 0) return null
+    val m = maxOf(1, Math.round(seconds / 60).toInt())
+    return if (m >= 60) "${m / 60} h ${m % 60} min" else "$m min"
+}
+
 @Composable
 fun Loading() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }

@@ -1,10 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ lesson.title }} · {{ course.title }}{% endblock %}
-{% block mainclass %}wide{% endblock %}
+{% block mainclass %}player{% endblock %}
 {% block content %}
+<div class="course-bar">
+  <a class="back" href="/">‹ My courses</a>
+  <span class="ctitle">{{ course.title }}</span>
+  <span class="cprog"><progress class="bar" id="cbar" value="{{ pct }}" max="100"></progress>
+    <span><b id="cdone">{{ done }}</b> / {{ total }} done</span></span>
+</div>
 <div class="player-layout">
   <div class="player-main">
-    <p class="crumbs"><a href="/course/{{ course.slug }}">{{ course.title }}</a> › {{ lesson.section }}</p>
     <div class="stage" id="stage">
       <video id="player" controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture
              data-src="/media/{{ course.slug }}/{{ lesson.id }}"
@@ -18,33 +23,74 @@
         <button class="primary" id="takeover">Watch here instead</button>
       </div>
     </div>
-    <h1>{{ lesson.title }}</h1>
-    <div class="nav-row">
-      {% if prev %}<a class="button" href="/course/{{ course.slug }}/{{ prev.id }}">‹ Previous</a>{% else %}<span></span>{% endif %}
-      <label class="small muted"><input type="checkbox" id="autonext" checked> Play next automatically</label>
-      {% if next %}<a class="button primary" href="/course/{{ course.slug }}/{{ next.id }}">Next ›</a>{% endif %}
+
+    <div class="under">
+      <div class="lesson-head">
+        <div>
+          <p class="eyebrow">{{ lesson.section }}</p>
+          <h1>{{ lesson.num }}. {{ lesson.title }}</h1>
+        </div>
+        <div class="nav-row">
+          {% if prev %}<a class="button" href="/course/{{ course.slug }}/{{ prev.id }}">‹ Previous</a>{% endif %}
+          {% if next %}<a class="button primary" href="/course/{{ course.slug }}/{{ next.id }}">Next ›</a>{% endif %}
+        </div>
+      </div>
+      <label class="small muted autonext"><input type="checkbox" id="autonext" checked> Play the next lesson automatically</label>
+
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab" id="t-overview" aria-controls="p-overview" aria-selected="true">Overview</button>
+        <button type="button" role="tab" class="tab" id="t-files" aria-controls="p-files" aria-selected="false">Files{% if files %} ({{ files|length }}){% endif %}</button>
+      </div>
+      <section class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="t-overview">
+        <h2>{{ course.title }}</h2>
+        <dl class="stats">
+          <div><dt>Lessons</dt><dd>{{ total }}</dd></div>
+          {% if course.total_duration %}<div><dt>Video</dt><dd>{{ course.total_duration|total }}</dd></div>{% endif %}
+          <div><dt>Sections</dt><dd>{{ sections|length }}</dd></div>
+          <div><dt>Your progress</dt><dd id="cpct">{{ pct }}%</dd></div>
+        </dl>
+        {% if course.description %}<p class="desc">{{ course.description }}</p>{% endif %}
+      </section>
+      <section class="tabpanel" id="p-files" role="tabpanel" aria-labelledby="t-files" hidden>
+        {% if lesson.attachments %}
+        <h3>This lesson</h3>
+        {% for f in lesson.attachments %}<a class="file" href="/media/{{ course.slug }}/{{ f.id }}">{{ f.name }} <span class="muted small">{{ f.size|size }}</span></a>{% endfor %}
+        {% endif %}
+        {% if section and section.resources %}
+        <h3>{{ section.title }}</h3>
+        {% for f in section.resources %}<a class="file" href="/media/{{ course.slug }}/{{ f.id }}">{{ f.name }} <span class="muted small">{{ f.size|size }}</span></a>{% endfor %}
+        {% endif %}
+        {% if not files %}<p class="muted">No files for this lesson.</p>{% endif %}
+      </section>
     </div>
-    {% if lesson.attachments %}
-    <div class="card files">
-      <h3>Files for this lesson</h3>
-      {% for f in lesson.attachments %}<a class="file" href="/media/{{ course.slug }}/{{ f.id }}">{{ f.name }} <span class="muted small">{{ f.size|size }}</span></a>{% endfor %}
-    </div>
-    {% endif %}
   </div>
-  <aside class="card outline">
-    <p class="small muted">{{ pct }}% of the course done</p>
-    <progress class="bar" value="{{ pct }}" max="100"></progress>
-    {% for s in course.sections %}{% if s.lessons %}
-    <h3>{{ s.title }}</h3>
-    <ol class="lessons compact">
-      {% for l in s.lessons %}{% set p = pm.get(l.file.path) %}
-      <li class="{{ 'done' if p and p.completed else '' }} {{ 'current' if l.id == lesson.id else '' }}">
-        <a href="/course/{{ course.slug }}/{{ l.id }}"><span class="tick" aria-hidden="true"></span><span class="t">{{ l.title }}</span></a>
-      </li>
-      {% endfor %}
-    </ol>
+
+  <aside class="outline" aria-label="Course content">
+    <h2 class="outline-head">Course content</h2>
+    {% for x in sections %}{% if x.s.lessons %}
+    <details class="sec"{% if x.current %} open{% endif %}>
+      <summary>
+        <span class="st">{{ x.s.title }}</span>
+        <span class="sm"><span class="sd">{{ x.done }}</span> / {{ x.s.lessons|length }}{% if x.length %} · {{ x.length|total }}{% endif %}</span>
+      </summary>
+      <ol class="lessons">
+        {% for l in x.s.lessons %}
+        <li class="{{ 'done' if l.id in done_ids }} {{ 'current' if l.id == lesson.id }}">
+          <button class="tick" type="button" data-lesson="{{ l.id }}" aria-pressed="{{ 'true' if l.id in done_ids else 'false' }}"
+                  aria-label="Done: {{ l.title }}" title="Mark as done"></button>
+          <a href="/course/{{ course.slug }}/{{ l.id }}"{% if l.id == lesson.id %} aria-current="page"{% endif %}>
+            <span class="t">{{ l.num }}. {{ l.title }}</span>
+            <span class="meta">
+              {% if l.duration %}<span>▶ {{ l.duration|dur }}</span>{% endif %}
+              {% if l.attachments %}<span>{{ l.attachments|length }} file{{ 's' if l.attachments|length > 1 }}</span>{% endif %}
+            </span>
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
+    </details>
     {% endif %}{% endfor %}
   </aside>
 </div>
-<script src="/static/player.js?v=2"></script>
+<script src="/static/player.js?v=3"></script>
 {% endblock %}

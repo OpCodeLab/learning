@@ -30,6 +30,7 @@ data class Attachment(val id: String, val name: String, val size: Long = 0)
 data class Lesson(
     val id: String, val title: String, val number: Int? = null, val index: Int = 0,
     val completed: Boolean = false, val position: Double = 0.0, val duration: Double = 0.0,
+    val length: Double? = null,   // seconds, read by the server from the video header
     val attachments: List<Attachment> = emptyList(),
 )
 
@@ -40,7 +41,7 @@ data class Section(val title: String, val lessons: List<Lesson>, val resources: 
 data class Course(
     val slug: String, val title: String, val description: String = "", val cover: String? = null,
     val done: Int = 0, val lessons: Int = 0, val pct: Int = 0, val resume: String? = null,
-    val watermark: String? = null, val sections: List<Section>,
+    val watermark: String? = null, val sections: List<Section>, val length: Double? = null,
 ) {
     val allLessons: List<Lesson> get() = sections.flatMap { it.lessons }
     fun sectionOf(lessonId: String): Section? = sections.firstOrNull { s -> s.lessons.any { it.id == lessonId } }

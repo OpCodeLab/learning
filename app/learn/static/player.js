@@ -76,7 +76,7 @@
   v.addEventListener("ended", function () {
     var p = send(true);
     var li = document.querySelector(".lessons li.current");
-    if (li) li.classList.add("done");
+    if (li && !li.classList.contains("done")) { mark(li, true); bump(1); }
     if (d.next && auto.checked) (p || Promise.resolve()).then(function () { location.href = d.next; });
   });
   document.addEventListener("visibilitychange", function () {
@@ -104,4 +104,51 @@
       if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen().catch(function () {});
     });
   }
+
+
+  // --- course content: tick a lesson by hand, like Udemy's checkboxes ------------------
+  var cdone = document.getElementById("cdone"), cbar = document.getElementById("cbar"), cpct = document.getElementById("cpct");
+  var total = document.querySelectorAll(".outline .lessons li").length;
+  function show(n) {
+    if (!cdone) return;
+    cdone.textContent = n;
+    var pct = total ? Math.round(100 * n / total) : 0;
+    if (cbar) cbar.value = pct;
+    if (cpct) cpct.textContent = pct + "%";
+  }
+  function mark(li, on) {   // tick + the section's "x / n" count
+    if (li.classList.contains("done") === on) return;
+    li.classList.toggle("done", on);
+    var b = li.querySelector(".tick");
+    if (b) b.setAttribute("aria-pressed", on ? "true" : "false");
+    var sd = li.closest("details") && li.closest("details").querySelector(".sd");
+    if (sd) sd.textContent = parseInt(sd.textContent, 10) + (on ? 1 : -1);
+  }
+  function bump(k) { if (cdone) show(parseInt(cdone.textContent, 10) + k); }
+  Array.prototype.forEach.call(document.querySelectorAll(".outline .tick"), function (b) {
+    b.addEventListener("click", function () {
+      var li = b.parentNode, on = !li.classList.contains("done");
+      mark(li, on);
+      fetch("/api/complete", {method: "POST", credentials: "same-origin", headers: H,
+                              body: JSON.stringify({course: d.course, lesson: b.dataset.lesson, completed: on})})
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function (j) { show(j.done); })
+        .catch(function () { mark(li, !on); });   // not saved: undo
+    });
+  });
+  var cur = document.querySelector(".outline li.current");
+  if (cur && cur.scrollIntoView) cur.scrollIntoView({block: "center"});
+  window.scrollTo(0, 0);
+
+  // --- tabs under the video (Overview / Files) -------------------------------------------
+  var tabs = document.querySelectorAll(".tabs .tab");
+  Array.prototype.forEach.call(tabs, function (t) {
+    t.addEventListener("click", function () {
+      Array.prototype.forEach.call(tabs, function (o) {
+        var sel = o === t;
+        o.setAttribute("aria-selected", sel ? "true" : "false");
+        document.getElementById(o.getAttribute("aria-controls")).hidden = !sel;
+      });
+    });
+  });
 })();
