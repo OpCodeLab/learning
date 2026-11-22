@@ -21,8 +21,8 @@ android {
         applicationId = "com.opcodelabs.learn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         // The course site; a debug build can point elsewhere: ./gradlew assembleDebug -PbaseUrl=http://10.0.2.2:18095
         buildConfigField("String", "BASE_URL",
             "\"" + (project.findProperty("baseUrl") as String? ?: "https://learn.opcode-labs.com") + "\"")

@@ -723,8 +723,9 @@ routes = [
 
 
 class SecurityHeaders:
-    """Strict CSP: only our own scripts, styles and media."""
-    CSP = ("default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; "
+    """Strict CSP: only our own scripts and media; styles also from Google Fonts (Barlow, as on the lab site)."""
+    CSP = ("default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' https://fonts.googleapis.com; "
+           "font-src https://fonts.gstatic.com; script-src 'self'; "
            "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
     def __init__(self, app):

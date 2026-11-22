@@ -65,7 +65,7 @@ fun AttachmentList(api: Api, slug: String, files: List<Attachment>, title: Strin
                     }
                 }
             }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.tertiary)
                 Spacer(Modifier.width(12.dp))
                 Text(f.name, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(formatSize(f.size), style = MaterialTheme.typography.bodySmall,

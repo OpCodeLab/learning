@@ -2,7 +2,13 @@ package com.opcodelabs.learn.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -44,10 +51,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opcodelabs.learn.BuildConfig
+import com.opcodelabs.learn.R
 import com.opcodelabs.learn.data.Api
 import com.opcodelabs.learn.data.ApiException
 import com.opcodelabs.learn.data.AppVersion
@@ -83,7 +92,10 @@ fun CoursesScreen(api: Api, email: String, onOpen: (String) -> Unit, onSignedOut
     }
 
     Scaffold(topBar = {
-        TopAppBar(title = { Text("My courses", fontWeight = FontWeight.SemiBold) }, actions = {
+        TopAppBar(title = { Text("My courses", fontWeight = FontWeight.Bold) }, colors = brandBarColors(),
+            navigationIcon = {
+                Image(painterResource(R.drawable.opcode_mark), "OpCode Labs", Modifier.padding(start = 14.dp, end = 4.dp).size(32.dp))
+            }, actions = {
             IconButton({ menu = true }) { Icon(Icons.Default.AccountCircle, "Account") }
             DropdownMenu(menu, { menu = false }) {
                 Text(email, Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -106,7 +118,8 @@ fun CoursesScreen(api: Api, email: String, onOpen: (String) -> Unit, onSignedOut
                     update?.let { v ->
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Banner("A new version (${v.version_name}) is available. Tap to download.")
-                            TextButton({ ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(v.url))) }) {
+                            TextButton({ ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(v.url))) },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)) {
                                 Text("Download the update")
                             }
                         }
@@ -124,10 +137,12 @@ fun CoursesScreen(api: Api, email: String, onOpen: (String) -> Unit, onSignedOut
 
 @Composable
 private fun CourseCardView(api: Api, c: CourseCard, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(14.dp),
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)) {
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Cover(api, c.slug, c.cover, c.title, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+        Box(Modifier.fillMaxWidth().height(3.dp).background(Gold))
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(c.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)

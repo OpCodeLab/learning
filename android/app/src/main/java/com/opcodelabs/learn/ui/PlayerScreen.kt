@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -226,7 +227,8 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
     when {
         c == null && error != null -> Box(Modifier.fillMaxSize()) { ErrorState(error!!, onBack) }
         landscape -> playerBox(Modifier.fillMaxSize())
-        else -> Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
+        else -> Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            Spacer(Modifier.fillMaxWidth().background(Chrome).statusBarsPadding())
             Box {
                 playerBox(Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                 IconButton(onBack, Modifier.align(Alignment.TopStart)) {

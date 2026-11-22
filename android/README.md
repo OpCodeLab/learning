@@ -10,6 +10,12 @@ courses and rules as learn.opcode-labs.com through the JSON API in `app/learn/ap
 | Course | Description, progress, *Continue* button, sections with ticks and attachment markers |
 | Player | The whole course as one playlist (next/previous, auto-advance), resume, speed (⚙), fullscreen in landscape, lesson files (opened in a PDF/zip viewer), lesson list |
 
+## Look
+Same design as the website and the lab site (lab.opcode-labs.com): black top bars, gold `#FCD23C` buttons,
+square corners. The launcher icon is the OpCode Labs logo on black (`res/drawable/ic_launcher_foreground.xml`,
+with a white version for Android's themed icons); `res/drawable/opcode_mark.xml` is the same logo for screens.
+Both use the paths of `app/learn/static/logo.svg`.
+
 ## Protections (same as the website, plus one)
 - **Counts as a device** in the 2-device limit (shown as "App on Pixel 7 (Android 14)").
 - **One video at a time**: it claims playback (`/api/play`) and pings every 15 s. If another device takes over,

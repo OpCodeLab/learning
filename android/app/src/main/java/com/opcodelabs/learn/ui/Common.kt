@@ -48,10 +48,10 @@ fun Cover(api: Api, slug: String, coverId: String?, title: String, modifier: Mod
             }?.also { imageCache[url] = it }
         }
     }
-    Box(modifier.background(Brush.linearGradient(listOf(Accent, Color(0xFF5B5FC7)))), contentAlignment = Alignment.Center) {
+    Box(modifier.background(Chrome), contentAlignment = Alignment.Center) {
         val b = bmp
         if (b != null) Image(b, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        else Text(title.take(1).uppercase(), color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+        else Text(title.take(1).uppercase(), color = Gold, fontSize = 48.sp, fontWeight = FontWeight.Bold)
     }
 }
 

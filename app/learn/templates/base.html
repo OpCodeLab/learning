@@ -6,25 +6,42 @@
 <meta name="robots" content="noindex, nofollow">
 <title>{% block title %}{{ site_name }}{% endblock %}</title>
 <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/style.css?v=3">
+<script src="/static/theme.js?v=1"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
-<header class="top">
-  <a class="brand" href="/"><img src="/static/logo.svg" alt="" width="28" height="28"><span>{{ site_name }}</span></a>
-  {% if user %}
-  <nav>
-    <a href="/">My courses</a>
-    {% if user.is_admin %}<a href="/admin">Students</a><a href="/admin/courses">Courses</a>{% endif %}
-    <a href="/account">Account</a>
-    <form method="post" action="/logout" class="inline">
-      <input type="hidden" name="csrf" value="{{ session.csrf }}">
-      <button class="link">Sign out</button>
-    </form>
-  </nav>
-  {% endif %}
+<header class="gbar">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/static/logo.svg" alt="" width="36" height="34"><span class="wordmark"><b>Op</b>Code Labs</span></a>
+    <span class="product">Learn</span>
+    {% if user %}
+    <nav class="usermenu">
+      <a href="/"{% if request.url.path == '/' or request.url.path.startswith('/course') %} aria-current="page"{% endif %}>My courses</a>
+      {% if user.is_admin %}
+      <a href="/admin"{% if request.url.path.startswith('/admin') and not request.url.path.startswith('/admin/courses') %} aria-current="page"{% endif %}>Students</a>
+      <a href="/admin/courses"{% if request.url.path.startswith('/admin/courses') %} aria-current="page"{% endif %}>Courses</a>
+      {% endif %}
+      <a href="/account"{% if request.url.path == '/account' %} aria-current="page"{% endif %}>Account</a>
+      <form method="post" action="/logout" class="inline">
+        <input type="hidden" name="csrf" value="{{ session.csrf }}">
+        <button class="link">Sign out</button>
+      </form>
+    </nav>
+    {% endif %}
+  </div>
 </header>
 <main class="{% block mainclass %}page{% endblock %}">
 {% block content %}{% endblock %}
 </main>
+<footer>
+  <div class="wrap">
+    <span>OpCode Labs · Embedded Training &amp; Consulting</span>
+    <a href="/android">Android app</a>
+    <a href="https://opcode-labs.com">opcode-labs.com</a>
+  </div>
+</footer>
 </body>
 </html>

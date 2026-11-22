@@ -79,3 +79,11 @@ sharing an account between several people impractical, and make it visible to yo
 5. **Sign out everywhere**, per student, without changing the password. *Disable* and *Password reset link* also sign them out.
 
 The invite page states the rule: personal access, 2 devices, one video at a time, sharing may close the account.
+
+## Look
+The site and the Android app share the design of the lab site (lab.opcode-labs.com, `web/assets/site.css` in
+the remote_bench repo): black header and footer like the logo, gold `#FCD23C` accent, Barlow type (Google Fonts),
+square corners, and a light/dark switch (`static/theme.js`, copied from the lab site, minus the injected `<style>`,
+which the CSP forbids). `static/logo.svg` is the OpCode Labs mark redrawn as vector from the lab's `opcode-mark.png`;
+the Android icon uses the same paths. The CSP allows `fonts.googleapis.com` (styles) and `fonts.gstatic.com` (fonts),
+and nothing else from outside.

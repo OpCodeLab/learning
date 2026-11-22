@@ -73,7 +73,8 @@ fun CourseScreen(api: Api, slug: String, onBack: () -> Unit, onPlay: (String) ->
 
     Scaffold(topBar = {
         TopAppBar(title = { Text(course?.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            navigationIcon = { IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } })
+            navigationIcon = { IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+            colors = brandBarColors())
     }) { pad ->
         val c = course
         when {
@@ -85,7 +86,7 @@ fun CourseScreen(api: Api, slug: String, onBack: () -> Unit, onPlay: (String) ->
                 c.sections.forEachIndexed { si, s ->
                     val closed = collapsed[si] ?: false
                     item(key = "s$si") {
-                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surface,
+                        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surface,
                             tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
                             Column {
                                 Row(Modifier.fillMaxWidth().clickable { collapsed[si] = !closed }.padding(16.dp),
@@ -115,7 +116,7 @@ fun CourseScreen(api: Api, slug: String, onBack: () -> Unit, onPlay: (String) ->
 private fun Header(api: Api, c: Course, onPlay: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Cover(api, c.slug, c.cover, c.title,
-            Modifier.widthIn(max = 640.dp).fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp)))
+            Modifier.widthIn(max = 640.dp).fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp)))
         Text(c.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         if (c.description.isNotBlank()) Text(c.description.trim(), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -123,7 +124,7 @@ private fun Header(api: Api, c: Course, onPlay: (String) -> Unit) {
         Text("${c.done} / ${c.lessons} lessons done · ${c.pct}%", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         val resume = c.allLessons.firstOrNull { it.id == c.resume }
-        if (resume != null) Button({ onPlay(resume.id) }, Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
+        if (resume != null) Button({ onPlay(resume.id) }, Modifier.fillMaxWidth(), shape = RoundedCornerShape(2.dp)) {
             Icon(Icons.Default.PlayArrow, null)
             Spacer(Modifier.width(8.dp))
             Text((if (c.done > 0) "Continue: " else "Start: ") + resume.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -141,7 +142,7 @@ fun LessonRow(l: Lesson, current: Boolean, onClick: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Text(l.title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+            color = if (current) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface)
         if (l.attachments.isNotEmpty()) Icon(Icons.Default.AttachFile, "Files", Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
