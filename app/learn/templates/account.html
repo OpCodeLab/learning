@@ -14,4 +14,25 @@
   <label>Repeat new password<input type="password" name="password2" minlength="10" autocomplete="new-password" required></label>
   <button class="primary">Change password</button>
 </form>
+
+{% if not user.is_admin %}
+<div class="card">
+  <h2>Your devices</h2>
+  <p class="muted small">You can be signed in on {{ max_devices }} devices. Signing in on another one signs out
+     the one used least recently. Only one video plays at a time.</p>
+  {% if signed_out %}<p class="ok">Other devices were signed out.</p>{% endif %}
+  <ul class="devices">
+    {% for d in devices %}
+    <li>{{ d.device or "Unknown device" }}{% if d.token_hash == session.token_hash %} <span class="chip okc">this device</span>{% endif %}
+      <br><span class="muted small">last active {{ d.last_seen|date }}</span></li>
+    {% endfor %}
+  </ul>
+  {% if devices|length > 1 %}
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="signout_others">
+    <button>Sign out the other devices</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

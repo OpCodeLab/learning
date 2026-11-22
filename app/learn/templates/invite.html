@@ -9,6 +9,8 @@
   <input type="email" name="email" value="{{ student.email }}" autocomplete="username" hidden>
   <label>New password<input type="password" name="password" minlength="10" autocomplete="new-password" required autofocus></label>
   <label>Repeat it<input type="password" name="password2" minlength="10" autocomplete="new-password" required></label>
+  <p class="muted small">Your access is personal. You can be signed in on {{ max_devices }} devices, and one video plays at a time.
+     Sharing your account may lead to it being closed without refund.</p>
   <button class="primary">Save and start</button>
 </form>
 {% endblock %}

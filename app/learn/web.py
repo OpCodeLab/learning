@@ -18,11 +18,12 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from . import catalog, config, security, store
+from . import catalog, config, guard, security, store
 
 HERE = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
 templates.env.globals["site_name"] = config.SITE_NAME
+templates.env.globals["max_devices"] = config.MAX_DEVICES
 COOKIE = "learn_s"
 
 
@@ -38,6 +39,7 @@ def fmt_size(n):
 
 
 templates.env.filters["date"] = fmt_date
+templates.env.filters["datetime"] = lambda ts: dt.datetime.fromtimestamp(ts).strftime("%d %b %H:%M") if ts else ""
 templates.env.filters["isodate"] = lambda ts: dt.date.fromtimestamp(ts).isoformat() if ts else ""
 templates.env.filters["size"] = fmt_size
 
@@ -88,17 +90,29 @@ def current(request, stage="ok"):
         if not s or s["expires_at"] < store.now() or s["stage"] != stage:
             return None, None
         u = store.user_by_id(c, s["user_id"])
+        if s["last_seen"] < store.now() - 300:   # "last active" per device, at most every 5 min
+            c.execute("UPDATE sessions SET last_seen = ?, ip = ? WHERE token_hash = ?",
+                      (store.now(), client_ip(request), s["token_hash"]))
     if not u or u["disabled"]:
         return None, None
     return s, u
 
 
-def start_session(response, uid, stage, seconds):
+def device_of(request):
+    return guard.device_name(request.headers.get("user-agent", ""))
+
+
+def start_session(request, response, user, stage, seconds):
     tok = security.new_token()
+    th, ip, dev = security.token_hash(tok), client_ip(request), device_of(request)
     with store.db() as c:
         store.purge_expired(c)
-        c.execute("INSERT INTO sessions (token_hash, user_id, csrf, stage, expires_at) VALUES (?,?,?,?,?)",
-                  (security.token_hash(tok), uid, security.new_token(), stage, store.now() + seconds))
+        c.execute("INSERT INTO sessions (token_hash, user_id, csrf, stage, expires_at, created_at, last_seen, ip, device) "
+                  "VALUES (?,?,?,?,?,?,?,?,?)", (th, user["id"], security.new_token(), stage, store.now() + seconds,
+                                                 store.now(), store.now(), ip, dev))
+        if stage == "ok" and not user["is_admin"]:
+            guard.log(c, user["id"], "login", ip, dev)
+            guard.enforce_device_limit(c, user["id"], th)
     response.set_cookie(COOKIE, tok, max_age=seconds, httponly=True, secure=config.COOKIE_SECURE,
                         samesite="lax", path="/")
 
@@ -181,13 +195,13 @@ async def login(request: Request):
         return render(request, "login.html", 401, next=nxt, email=email, error="Wrong email or password.")
     if u["is_admin"]:
         resp = RedirectResponse("/login/code?next=" + urllib.parse.quote(nxt), 303)
-        start_session(resp, u["id"], "totp", 300)
+        start_session(request, resp, u, "totp", 300)
         return resp
     throttle.clear(email)
     with store.db() as c:
         c.execute("UPDATE users SET last_login = ? WHERE id = ?", (store.now(), u["id"]))
     resp = RedirectResponse(nxt, 303)
-    start_session(resp, u["id"], "ok", config.STUDENT_SESSION_DAYS * 86400)
+    start_session(request, resp, u, "ok", config.STUDENT_SESSION_DAYS * 86400)
     return resp
 
 
@@ -212,7 +226,7 @@ async def login_code(request: Request):
         c.execute("UPDATE users SET totp_step = ?, last_login = ? WHERE id = ?", (step, store.now(), u["id"]))
     resp = RedirectResponse(nxt if nxt != "/" else "/admin", 303)
     end_session(request, resp)
-    start_session(resp, u["id"], "ok", config.ADMIN_SESSION_HOURS * 3600)
+    start_session(request, resp, u, "ok", config.ADMIN_SESSION_HOURS * 3600)
     return resp
 
 
@@ -251,7 +265,7 @@ async def invite(request: Request):
         c.execute("DELETE FROM invites WHERE user_id = ?", (u["id"],))
         c.execute("DELETE FROM sessions WHERE user_id = ?", (u["id"],))
     resp = RedirectResponse("/", 303)
-    start_session(resp, u["id"], "ok", config.STUDENT_SESSION_DAYS * 86400)
+    start_session(request, resp, u, "ok", config.STUDENT_SESSION_DAYS * 86400)
     return resp
 
 
@@ -354,9 +368,48 @@ async def progress_api(request: Request):
     except (TypeError, ValueError):
         return JSONResponse({"error": "bad numbers"}, 400)
     completed = bool(data.get("ended")) or (dur > 0 and pos >= 0.9 * dur)
+    playing = bool(data.get("playing"))
     with store.db() as c:
+        if not u["is_admin"]:
+            other = guard.playing_elsewhere(c, u["id"], s["token_hash"])
+            if other and playing:
+                # another device took over: this one must stop (progress is still saved)
+                store.save_progress(c, u["id"], slug, lesson.file.path, pos, dur, completed)
+                return JSONResponse({"error": "elsewhere", "device": other["device"]}, 409)
+            if playing:
+                guard.take_playback(c, u["id"], s["token_hash"], s["device"])
+            else:
+                guard.release_playback(c, u["id"], s["token_hash"])
         store.save_progress(c, u["id"], slug, lesson.file.path, pos, dur, completed)
     return JSONResponse({"ok": True, "completed": completed})
+
+
+async def play_api(request: Request):
+    """Called when the player starts. 409 if the account is already playing on another device,
+    unless the student chose "Watch here instead" (takeover)."""
+    s, u = current(request)
+    if not u:
+        return JSONResponse({"error": "login"}, 401)
+    if request.method == "GET":   # status only, takes nothing: is another device playing?
+        if u["is_admin"]:
+            return JSONResponse({"elsewhere": None})
+        with store.db() as c:
+            other = guard.playing_elsewhere(c, u["id"], s["token_hash"])
+        return JSONResponse({"elsewhere": other["device"] if other else None})
+    if not (same_origin(request) and hmac.compare_digest(request.headers.get("x-csrf-token", ""), s["csrf"])):
+        return JSONResponse({"error": "csrf"}, 403)
+    if u["is_admin"]:
+        return JSONResponse({"ok": True})
+    data = await request.json()
+    with store.db() as c:
+        other = guard.playing_elsewhere(c, u["id"], s["token_hash"])
+        if other and not data.get("takeover"):
+            guard.log(c, u["id"], "blocked", client_ip(request), s["device"])
+            return JSONResponse({"error": "elsewhere", "device": other["device"]}, 409)
+        if other:
+            guard.log(c, u["id"], "takeover", client_ip(request), s["device"])
+        guard.take_playback(c, u["id"], s["token_hash"], s["device"])
+    return JSONResponse({"ok": True})
 
 
 async def media(request: Request):
@@ -377,10 +430,15 @@ async def media(request: Request):
     f = lesson.file if lesson else course.file(fid)
     if not f:
         raise HTTPException(404)
+    if lesson and not u["is_admin"]:
+        with store.db() as c:
+            if guard.playing_elsewhere(c, u["id"], s["token_hash"]):
+                raise HTTPException(409)   # the other device must stop first (or be taken over)
     disposition = "inline" if lesson or f is course.cover else "attachment"
     headers = {
         "Content-Disposition": "%s; filename*=UTF-8''%s" % (disposition, urllib.parse.quote(f.name)),
-        "Cache-Control": "private, max-age=3600",
+        # videos: no browser cache, so every part goes through the access check above
+        "Cache-Control": "private, no-store" if lesson else "private, max-age=3600",
         "X-Content-Type-Options": "nosniff",
     }
     raw_path = "/raw/" + urllib.parse.quote(slug + "/" + f.path)
@@ -409,11 +467,22 @@ async def media(request: Request):
     return StreamingResponse(body(), status_code=up.status, headers=headers)
 
 
+def account_page(request, s, u, status=200, **extra):
+    with store.db() as c:
+        devs = guard.devices(c, u["id"])
+    return render(request, "account.html", status, user=u, session=s, devices=devs,
+                  max_devices=config.MAX_DEVICES, **extra)
+
+
 async def account(request: Request):
     s, u = need_login(request)
     if request.method == "GET":
-        return render(request, "account.html", user=u, session=s)
+        return account_page(request, s, u)
     form = await form_checked(request, s)
+    if form.get("action") == "signout_others":
+        with store.db() as c:
+            c.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?", (u["id"], s["token_hash"]))
+        return account_page(request, s, u, signed_out=True)
     cur, pw, pw2 = form.get("current") or "", form.get("password") or "", form.get("password2") or ""
     error = None
     if not security.verify_password(cur, u["pw_hash"] or security.DUMMY_HASH):
@@ -423,13 +492,12 @@ async def account(request: Request):
     elif pw != pw2:
         error = "The two new passwords are different."
     if error:
-        return render(request, "account.html", 400, user=u, session=s, error=error)
-    tok_hash = security.token_hash(request.cookies.get(COOKIE, ""))
+        return account_page(request, s, u, 400, error=error)
     with store.db() as c:
         c.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (security.hash_password(pw), u["id"]))
         # sign out every other device
-        c.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?", (u["id"], tok_hash))
-    return render(request, "account.html", user=u, session=s, saved=True)
+        c.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?", (u["id"], s["token_hash"]))
+    return account_page(request, s, u, saved=True)
 
 
 # --- admin --------------------------------------------------------------------------
@@ -460,7 +528,8 @@ async def admin_home(request: Request):
         rows = []
         for st in store.students(c):
             ens = store.enrollments(c, st["id"])
-            rows.append(dict(user=st, enrollments=ens, invited=st["pw_hash"] is None))
+            rows.append(dict(user=st, enrollments=ens, invited=st["pw_hash"] is None,
+                             signals=guard.signals(c, st["id"])))
     try:
         names = catalog.course_names()
     except catalog.Unavailable:
@@ -530,6 +599,10 @@ async def admin_user(request: Request):
             elif action == "invite":
                 link = new_invite(c, uid)
                 c.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
+            elif action == "signout_all":
+                c.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
+                c.execute("DELETE FROM playback WHERE user_id = ?", (uid,))
+                msg = "Signed out on every device. The password is unchanged."
             elif action == "disable":
                 c.execute("UPDATE users SET disabled = 1 WHERE id = ?", (uid,))
                 c.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
@@ -557,9 +630,12 @@ async def admin_user(request: Request):
             if course:
                 _, done, total, pct = course_progress(c, uid, course)
                 prog.append(dict(course=e["course"], title=course.title, done=done, total=total, pct=pct))
+        devs = guard.devices(c, uid)
+        sig = guard.signals(c, uid)
     return render(request, "admin_user.html", user=u, session=s, st=st, enrollments=ens, courses=names,
                   progress={p["course"]: p for p in prog}, link=link, msg=msg, expiry=default_expiry(),
-                  now=store.now(), days=config.INVITE_DAYS)
+                  now=store.now(), days=config.INVITE_DAYS, devices=devs, signals=sig,
+                  max_devices=config.MAX_DEVICES)
 
 
 async def admin_courses(request: Request):
@@ -604,6 +680,7 @@ routes = [
     Route("/course/{slug}/{lid}", lesson_page),
     Route("/media/{slug}/{fid}", media, methods=["GET", "HEAD"]),
     Route("/api/progress", progress_api, methods=["POST"]),
+    Route("/api/play", play_api, methods=["GET", "POST"]),
     Route("/admin", admin_home),
     Route("/admin/new", admin_new, methods=["GET", "POST"]),
     Route("/admin/user/{uid:int}", admin_user, methods=["GET", "POST"]),

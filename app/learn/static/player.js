@@ -1,14 +1,53 @@
-// Resume where the student stopped, save progress, go to the next lesson at the end.
+// Lesson player: one video at a time per account, resume, progress, auto-next, watermark.
 (function () {
   var v = document.getElementById("player");
   if (!v) return;
   var d = v.dataset, lastSent = 0, sending = false;
+  var stage = document.getElementById("stage");
+  var box = document.getElementById("elsewhere");
   var auto = document.getElementById("autonext");
+  var H = {"Content-Type": "application/json", "X-CSRF-Token": d.csrf};
+
   try { if (localStorage.getItem("autonext") === "0") auto.checked = false; } catch (e) {}
   auto.addEventListener("change", function () {
     try { localStorage.setItem("autonext", auto.checked ? "1" : "0"); } catch (e) {}
   });
 
+  // --- one video at a time ------------------------------------------------------
+  function blocked(device) {
+    v.pause();
+    document.getElementById("elsewhere-device").textContent = device ? "(" + device + ")" : "";
+    box.hidden = false;
+  }
+  function load() {          // attach the video only once this device may play
+    if (!v.getAttribute("src")) { v.src = d.src; }
+  }
+  function claim(takeover) {
+    return fetch("/api/play", {method: "POST", credentials: "same-origin", headers: H,
+                               body: JSON.stringify({takeover: !!takeover})})
+      .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); });
+  }
+  fetch("/api/play", {credentials: "same-origin"}).then(function (r) { return r.json(); })
+    .then(function (j) { if (j.elsewhere) blocked(j.elsewhere); else load(); })
+    .catch(load);
+  document.getElementById("takeover").addEventListener("click", function () {
+    claim(true).then(function (res) {
+      if (!res.ok) return;
+      box.hidden = true;
+      var t = v.currentTime;
+      if (!v.getAttribute("src")) load(); else { v.load(); v.currentTime = t; }
+      v.play().catch(function () {});
+    });
+  });
+  v.addEventListener("play", function () {
+    claim(false).then(function (res) { if (!res.ok && res.j.error === "elsewhere") blocked(res.j.device); });
+  });
+  v.addEventListener("error", function () {   // e.g. 409: another device started meanwhile
+    fetch("/api/play", {credentials: "same-origin"}).then(function (r) { return r.json(); })
+      .then(function (j) { if (j.elsewhere) blocked(j.elsewhere); });
+  });
+
+  // --- resume and progress ------------------------------------------------------
   v.addEventListener("loadedmetadata", function () {
     var start = parseFloat(d.start || "0");
     if (start > 5 && start < v.duration - 5) v.currentTime = start;
@@ -18,16 +57,17 @@
   function send(ended, beacon) {
     if (!v.duration || sending) return;
     var body = JSON.stringify({course: d.course, lesson: d.lesson, position: v.currentTime,
-                               duration: v.duration, ended: !!ended});
+                               duration: v.duration, ended: !!ended, playing: !v.paused && !ended});
     lastSent = Date.now();
     if (beacon) {   // page is closing: fire and forget
-      fetch("/api/progress", {method: "POST", body: body, keepalive: true, credentials: "same-origin",
-        headers: {"Content-Type": "application/json", "X-CSRF-Token": d.csrf}});
+      fetch("/api/progress", {method: "POST", body: body, keepalive: true, credentials: "same-origin", headers: H});
       return;
     }
     sending = true;
-    return fetch("/api/progress", {method: "POST", body: body, credentials: "same-origin",
-      headers: {"Content-Type": "application/json", "X-CSRF-Token": d.csrf}})
+    return fetch("/api/progress", {method: "POST", body: body, credentials: "same-origin", headers: H})
+      .then(function (r) {
+        if (r.status === 409) return r.json().then(function (j) { blocked(j.device); });
+      })
       .catch(function () {}).then(function () { sending = false; });
   }
 
@@ -42,4 +82,26 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden" && !v.paused) send(false, true);
   });
+
+  // --- watermark: the student's email, moving every 40 s, also in fullscreen ------------
+  var wm = document.getElementById("watermark");
+  if (wm) {
+    var move = function () {
+      wm.style.left = (5 + Math.random() * 55) + "%";
+      wm.style.top = (8 + Math.random() * 70) + "%";
+    };
+    move();
+    setInterval(move, 40000);
+    // The native fullscreen button would show the <video> alone (without the watermark):
+    // switch to fullscreen of the whole stage instead.
+    document.addEventListener("fullscreenchange", function () {
+      if (document.fullscreenElement === v) {
+        document.exitFullscreen().then(function () { return stage.requestFullscreen(); }).catch(function () {});
+      }
+    });
+    v.addEventListener("dblclick", function (e) {
+      e.preventDefault();
+      if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen().catch(function () {});
+    });
+  }
 })();

@@ -11,7 +11,7 @@
 {% else %}
 <div class="card table-wrap">
 <table>
-  <thead><tr><th>Student</th><th>Courses (access until)</th><th>Status</th><th>Last sign-in</th></tr></thead>
+  <thead><tr><th>Student</th><th>Courses (access until)</th><th>Status</th><th>Sharing (30 days)</th><th>Last sign-in</th></tr></thead>
   <tbody>
   {% for r in rows %}
   <tr>
@@ -22,6 +22,8 @@
     <td>{% if r.user.disabled %}<span class="chip expired">disabled</span>
         {% elif r.invited %}<span class="chip">invite pending</span>
         {% else %}<span class="chip okc">active</span>{% endif %}</td>
+    <td class="small">{% if r.signals.warnings %}<a class="signal" href="/admin/user/{{ r.user.id }}" title="{{ r.signals.warnings|join('; ') }}">⚠ {{ r.signals.warnings|length }} signal{{ 's' if r.signals.warnings|length > 1 }}</a>
+        {% else %}<span class="muted">{{ r.signals.devices }} device{{ 's' if r.signals.devices != 1 }} · {{ r.signals.networks }} network{{ 's' if r.signals.networks != 1 }}</span>{% endif %}</td>
     <td class="muted small">{{ r.user.last_login|date if r.user.last_login else 'never' }}</td>
   </tr>
   {% endfor %}

@@ -180,6 +180,63 @@ try:
     check("course % after one of three lessons", "1 / 3 lessons" in r.text, re.findall(r"\d+ / \d+ lessons", r.text))
     r = st.get("/course/linux_udemy")
     check("continue button points to lesson 2", ('href="/course/linux_udemy/%s">Continue' % lids[1]) in r.text)
+    with store.db() as c:
+        uid0 = store.user_by_email(c, "alice@example.com")["id"]
+
+    # --- anti-sharing ---------------------------------------------------------------
+    UA = {"pc": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36",
+          "phone": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36",
+          "mac": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/605.1.15 Version/17.1 Safari/605.1.15"}
+
+    def device(name, ip):
+        cl = TestClient(web.app, base_url="http://testserver", follow_redirects=False,
+                        headers={"User-Agent": UA[name], "X-Real-IP": ip})
+        r = cl.post("/login", data={"email": "alice@example.com", "password": "alice-pass-123"}, headers=H)
+        assert r.status_code == 303, r.status_code
+        return cl, csrf_of(cl.get("/course/linux_udemy/" + first).text)
+
+    pc, pc_csrf = device("pc", "81.10.0.5")
+    phone, ph_csrf = device("phone", "41.226.7.9")
+    check("2 extra devices: the oldest (invite session) is signed out", st.get("/").status_code == 303)
+    mac, mac_csrf = device("mac", "196.203.1.1")
+    check("3rd device signs out the least recent one (pc)", pc.get("/").status_code == 303
+          and phone.get("/").status_code == 200)
+    with store.db() as c:                         # the phone was used more recently than the mac
+        c.execute("UPDATE sessions SET last_seen = last_seen + 60 WHERE device = 'Chrome on Android'")
+    pc, pc_csrf = device("pc", "81.10.0.5")       # pc back in, mac (least recently active) out
+    r = phone.get("/account")
+    check("account page lists devices", "Chrome on Android" in r.text and "Chrome on Windows" in r.text
+          and "Safari on Mac" not in r.text, re.findall(r"\w+ on \w+", r.text))
+
+    JH = lambda tok: dict(H, **{"X-CSRF-Token": tok})
+    play = lambda cl, tok, takeover=False: cl.post("/api/play", json={"takeover": takeover}, headers=JH(tok))
+    ping = lambda cl, tok, playing: cl.post("/api/progress", json={"course": "linux_udemy", "lesson": first,
+                                            "position": 10, "duration": 100, "playing": playing}, headers=JH(tok))
+    check("pc starts playing", play(pc, pc_csrf).status_code == 200 and ping(pc, pc_csrf, True).status_code == 200)
+    check("phone sees 'playing elsewhere'", phone.get("/api/play").json()["elsewhere"] == "Chrome on Windows")
+    check("phone play refused (409)", play(phone, ph_csrf).status_code == 409)
+    check("phone gets no video bytes while pc plays", phone.get("/media/linux_udemy/" + first,
+          headers={"Range": "bytes=0-9"}).status_code == 409)
+    check("attachments still fine on phone", phone.get("/media/linux_udemy/" + att.group(1)).status_code == 200)
+    check("phone takes over", play(phone, ph_csrf, takeover=True).status_code == 200)
+    check("pc heartbeat now told to stop", ping(pc, pc_csrf, True).status_code == 409)
+    check("pc gets no more video bytes", pc.get("/media/linux_udemy/" + first,
+          headers={"Range": "bytes=0-9"}).status_code == 409)
+    check("phone pauses -> lock released", ping(phone, ph_csrf, False).status_code == 200
+          and play(pc, pc_csrf).status_code == 200)
+    r = app.get("/admin")
+    check("admin list shows the sharing column", "Sharing (30 days)" in r.text)
+    r = app.get("/admin/user/%d" % uid0)
+    check("admin student page: devices + activity", "Chrome on Android" in r.text and "took over playback" in r.text
+          and "signed out by the device limit" in r.text)
+    app.post("/admin/user/%d" % uid0, data={"csrf": csrf, "action": "signout_all"}, headers=H)
+    check("admin 'sign out everywhere'", pc.get("/").status_code == 303 and phone.get("/").status_code == 303)
+    with store.db() as c:
+        for i in range(6):
+            web.guard.log(c, uid0, "login", "10.%d.0.1" % i, "Chrome on Windows")
+        sig = web.guard.signals(c, uid0)
+    check("6 networks in a week -> warning", any("networks" in w for w in sig["warnings"]), sig["warnings"])
+    st.post("/login", data={"email": "alice@example.com", "password": "alice-pass-123"}, headers=H)
 
     # expiry and disable
     with store.db() as c:

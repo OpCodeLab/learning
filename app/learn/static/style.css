@@ -113,6 +113,20 @@ a.file { justify-content: flex-start; } a.file span { margin-left: auto; }
 /* player */
 .player-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
 .player-main video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius); display: block; }
+.stage { position: relative; }
+.stage:fullscreen { background: #000; display: flex; align-items: center; }
+.stage:fullscreen video { border-radius: 0; height: 100%; aspect-ratio: auto; }
+.watermark { position: absolute; left: 10%; top: 10%; pointer-events: none; user-select: none; z-index: 2;
+  color: rgba(255, 255, 255, .28); text-shadow: 0 0 2px rgba(0, 0, 0, .35); font-size: clamp(11px, 1.4vw, 18px);
+  font-weight: 600; transition: left 2s, top 2s; white-space: nowrap; }
+.elsewhere { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 4px; text-align: center; padding: 16px; color: #fff;
+  background: rgba(10, 14, 20, .88); border-radius: var(--radius); }
+.elsewhere[hidden] { display: none; }
+.elsewhere .muted { color: #c7ced8; }
+.devices li { padding: 6px 0; border-bottom: 1px solid var(--line); list-style: none; }
+.devices { padding: 0; margin: 8px 0; }
+.signal { color: var(--warn); font-weight: 600; }
 .player-main h1 { font-size: 1.35rem; margin: 14px 0 10px; }
 .nav-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 aside.outline { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow: auto; padding: 16px; }

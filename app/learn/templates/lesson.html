@@ -5,10 +5,19 @@
 <div class="player-layout">
   <div class="player-main">
     <p class="crumbs"><a href="/course/{{ course.slug }}">{{ course.title }}</a> › {{ lesson.section }}</p>
-    <video id="player" controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture
-           src="/media/{{ course.slug }}/{{ lesson.id }}"
-           data-course="{{ course.slug }}" data-lesson="{{ lesson.id }}" data-start="{{ start }}"
-           data-csrf="{{ session.csrf }}" data-next="{{ '/course/%s/%s' % (course.slug, next.id) if next else '' }}"></video>
+    <div class="stage" id="stage">
+      <video id="player" controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture
+             data-src="/media/{{ course.slug }}/{{ lesson.id }}"
+             data-course="{{ course.slug }}" data-lesson="{{ lesson.id }}" data-start="{{ start }}"
+             data-csrf="{{ session.csrf }}" data-next="{{ '/course/%s/%s' % (course.slug, next.id) if next else '' }}"></video>
+      {% if not user.is_admin %}<div class="watermark" id="watermark" aria-hidden="true">{{ user.email }}</div>{% endif %}
+      <div class="elsewhere" id="elsewhere" hidden>
+        <p><strong>This account is watching on another device</strong><br>
+           <span class="muted small" id="elsewhere-device"></span></p>
+        <p class="small">Your access is personal: one video at a time.</p>
+        <button class="primary" id="takeover">Watch here instead</button>
+      </div>
+    </div>
     <h1>{{ lesson.title }}</h1>
     <div class="nav-row">
       {% if prev %}<a class="button" href="/course/{{ course.slug }}/{{ prev.id }}">‹ Previous</a>{% else %}<span></span>{% endif %}
@@ -37,5 +46,5 @@
     {% endif %}{% endfor %}
   </aside>
 </div>
-<script src="/static/player.js?v=1"></script>
+<script src="/static/player.js?v=2"></script>
 {% endblock %}

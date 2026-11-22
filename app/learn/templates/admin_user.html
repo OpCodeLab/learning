@@ -56,6 +56,38 @@
 </div>
 
 <div class="card">
+  <div class="head-row">
+    <h2>Devices and sharing signals</h2>
+    <form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="signout_all">
+      <button>Sign out everywhere</button></form>
+  </div>
+  {% for w in signals.warnings %}<p class="warn">⚠ {{ w }}</p>{% else %}<p class="muted small">No unusual activity in the last 30 days.</p>{% endfor %}
+  <p class="small">Last 30 days: {{ signals.logins }} sign-ins · {{ signals.devices }} devices · {{ signals.networks }} networks ·
+     this week {{ signals.evicted }} devices pushed out by the {{ max_devices }}-device limit, {{ signals.takeovers }} play conflicts</p>
+  <h3>Signed in now ({{ devices|length }}/{{ max_devices }})</h3>
+  <ul class="devices">
+    {% for d in devices %}<li>{{ d.device or "Unknown device" }} <span class="muted small">· {{ d.ip }} · last active {{ d.last_seen|date }}</span></li>
+    {% else %}<li class="muted">none</li>{% endfor %}
+  </ul>
+  {% if signals.events %}
+  <details>
+    <summary>Recent activity</summary>
+    <table>
+      <thead><tr><th>When</th><th>What</th><th>Device</th><th>IP</th></tr></thead>
+      <tbody>
+      {% for e in signals.events %}
+      <tr><td class="small">{{ e.at|datetime }}</td>
+          <td class="small">{{ {'login': 'signed in', 'evicted': 'signed out by the device limit',
+                                'takeover': 'took over playback', 'blocked': 'blocked: playing elsewhere'}[e.kind] }}</td>
+          <td class="small">{{ e.device }}</td><td class="small mono">{{ e.ip }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+</div>
+
+<div class="card">
   <h2>Account</h2>
   <form method="post" class="row">
     <input type="hidden" name="csrf" value="{{ session.csrf }}"><input type="hidden" name="action" value="name">

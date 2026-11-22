@@ -59,3 +59,23 @@ video once yourself, or skip through it.
 - **No DRM:** links work only with a valid session, the download button is hidden, and right-click is off.
   A determined student can still screen-record. Udemy has the same limit.
 - `noindex` on everything, so search engines don't list the site.
+
+## Account sharing (`app/learn/guard.py`, students only)
+A paid account should serve one person. Nothing can stop two people watching one screen, but these measures make
+sharing an account between several people impractical, and make it visible to you.
+1. **2 devices.** Each sign-in is a device (browser + OS, e.g. "Chrome on Windows"). Signing in on a 3rd one signs out
+   the one active least recently. `LEARN_MAX_DEVICES` in `/etc/opcode-learn/learn.env` changes the limit.
+   Students see their devices on *Account* and can sign the others out.
+2. **One video at a time, enforced by the server.** The player claims playback (`/api/play`) and renews it with its
+   progress pings every 15 s. While another device holds it (pinged in the last 45 s), video requests from other
+   devices get `409`, and their player shows *"This account is watching on another device"* with a
+   *Watch here instead* button. That button takes over, and the first device stops within 15 s. A pause frees it at once.
+   Videos are sent with `no-store`, so the browser can't replay cached parts around the check.
+3. **Sharing signals.** Sign-ins, device-limit sign-outs and play conflicts are logged (`events` table, 90 days)
+   with IP and device. The Students list shows ⚠ when, for example, there were 5+ networks in a week, 5+ devices in
+   30 days, 4+ device-limit sign-outs or 6+ play conflicts in a week. The student's page shows the details.
+4. **Watermark.** The student's email is shown faintly over the video and moves every 40 s. Fullscreen covers the
+   whole player, watermark included. (On an iPhone, Safari's own fullscreen player can't show it.)
+5. **Sign out everywhere**, per student, without changing the password. *Disable* and *Password reset link* also sign them out.
+
+The invite page states the rule: personal access, 2 devices, one video at a time, sharing may close the account.

@@ -15,6 +15,8 @@ All from the web admin (Students):
 | Forgot password | the student's page → *Password reset link* (also signs them out everywhere) |
 | Stop access now | *Disable account* (reversible) or *Remove* one course |
 | Delete | *Delete this account* (type the email). Progress is deleted too. Files never are. |
+| Suspect sharing (⚠ in the list) | the student's page → *Devices and sharing signals*: who, where, when. Then warn them, *Sign out everywhere*, *Password reset link*, or *Disable* |
+| Student locked out by the device limit | nothing to do: signing in again works, and the least recently used device is signed out |
 
 ## Status and logs
 | What | Where |

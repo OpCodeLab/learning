@@ -25,6 +25,21 @@ CREATE TABLE IF NOT EXISTS sessions (
     stage       TEXT NOT NULL DEFAULT 'ok', -- 'totp' = password ok, waiting for the code
     expires_at  INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS events (            -- for the account-sharing signals
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    at          INTEGER NOT NULL,
+    kind        TEXT NOT NULL,              -- login | evicted | takeover | blocked
+    ip          TEXT NOT NULL DEFAULT '',
+    device      TEXT NOT NULL DEFAULT ''    -- e.g. "Chrome on Windows"
+);
+CREATE INDEX IF NOT EXISTS events_user_at ON events (user_id, at);
+CREATE TABLE IF NOT EXISTS playback (           -- one video at a time per account
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    session     TEXT NOT NULL,              -- token_hash of the session that plays
+    device      TEXT NOT NULL DEFAULT '',
+    updated_at  INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS invites (
     token_hash  TEXT PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -68,9 +83,21 @@ def db():
         con.close()
 
 
+# Columns added after the first release: (table, column, definition).
+MIGRATIONS = [
+    ("sessions", "created_at", "INTEGER NOT NULL DEFAULT 0"),
+    ("sessions", "last_seen", "INTEGER NOT NULL DEFAULT 0"),
+    ("sessions", "ip", "TEXT NOT NULL DEFAULT ''"),
+    ("sessions", "device", "TEXT NOT NULL DEFAULT ''"),
+]
+
+
 def init():
     with db() as c:
         c.executescript(SCHEMA)
+        for table, col, definition in MIGRATIONS:
+            if col not in {r["name"] for r in c.execute("PRAGMA table_info(%s)" % table)}:
+                c.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, col, definition))
 
 
 def now():
@@ -144,3 +171,4 @@ def purge_expired(c):
     t = now()
     c.execute("DELETE FROM sessions WHERE expires_at < ?", (t,))
     c.execute("DELETE FROM invites WHERE expires_at < ?", (t,))
+    c.execute("DELETE FROM events WHERE at < ?", (t - 90 * 86400,))   # keep 90 days

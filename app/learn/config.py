@@ -16,3 +16,4 @@ ADMIN_SESSION_HOURS = 8
 INVITE_DAYS = 14
 MIN_PASSWORD = 10
 CATALOG_TTL = 60          # seconds between re-reads of the course folders
+MAX_DEVICES = int(os.environ.get("LEARN_MAX_DEVICES", "2"))   # signed-in devices per student
