@@ -1,0 +1,11 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+# Release signing key and its passwords: never in Git (back them up privately).
+keystore.properties
+*.jks
+*.keystore
+dist/

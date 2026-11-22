@@ -13,6 +13,9 @@ PLAY_FRESH = 45        # s: a device "is playing" if it pinged within this windo
 def device_name(ua):
     """'Mozilla/5.0 (Windows NT 10.0; ...) Chrome/131...' -> 'Chrome on Windows'."""
     ua = ua or ""
+    m = re.match(r"OpCodeLearn/[\w.]+ \(Android ([\w.]+); ([^)]{1,40})\)", ua)   # our Android app
+    if m:
+        return "App on %s (Android %s)" % (m.group(2).strip(), m.group(1))
     os_name = next((n for p, n in (
         (r"iPhone|iPod", "iPhone"), (r"iPad", "iPad"), (r"Android", "Android"), (r"Windows", "Windows"),
         (r"Mac OS X|Macintosh", "Mac"), (r"CrOS", "ChromeOS"), (r"Linux", "Linux")) if re.search(p, ua)), "unknown OS")

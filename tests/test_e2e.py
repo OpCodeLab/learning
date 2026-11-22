@@ -238,6 +238,40 @@ try:
     check("6 networks in a week -> warning", any("networks" in w for w in sig["warnings"]), sig["warnings"])
     st.post("/login", data={"email": "alice@example.com", "password": "alice-pass-123"}, headers=H)
 
+    # --- Android app API (bearer token, no cookies, no CSRF) ------------------------
+    mob = TestClient(web.app, base_url="http://testserver", follow_redirects=False,
+                     headers={"User-Agent": "OpCodeLearn/1.0 (Android 14; Pixel 7)", "X-Real-IP": "41.1.1.1"})
+    check("app: wrong password -> 401", mob.post("/api/v1/login", json={"email": "alice@example.com",
+                                                                        "password": "nope"}).status_code == 401)
+    r = mob.post("/api/v1/login", json={"email": "alice@example.com", "password": "alice-pass-123"})
+    tok = r.json().get("token", "")
+    check("app: login returns a token", r.status_code == 200 and len(tok) > 20 and not mob.cookies)
+    B = {"Authorization": "Bearer " + tok}
+    check("app: no token -> 401", mob.get("/api/v1/courses").status_code == 401)
+    r = mob.get("/api/v1/courses", headers=B)
+    check("app: course list (linux only)", [c["slug"] for c in r.json()["courses"]] == ["linux_udemy"], r.text[:200])
+    r = mob.get("/api/v1/courses/linux_udemy", headers=B)
+    j = r.json()
+    check("app: course JSON with sections, lessons, attachments, watermark",
+          j["title"] == "Linux from scratch" and len(j["sections"]) == 2 and j["watermark"] == "alice@example.com"
+          and j["sections"][0]["lessons"][0]["attachments"][0]["name"] == "01 Welcome.pdf", r.text[:300])
+    check("app: other course -> 404", mob.get("/api/v1/courses/rtos_record", headers=B).status_code == 404)
+    r = mob.get("/media/linux_udemy/" + first, headers=dict(B, Range="bytes=0-9"))
+    check("app: video with bearer token", r.status_code == 206 and r.content == VIDEO[:10])
+    r = mob.post("/api/play", json={}, headers=B)
+    check("app: play without CSRF (bearer)", r.status_code == 200, r.text)
+    r = mob.post("/api/progress", json={"course": "linux_udemy", "lesson": first, "position": 12, "duration": 100,
+                                        "playing": True}, headers=B)
+    check("app: progress ping", r.status_code == 200)
+    check("website sees the app playing", st.get("/api/play").json()["elsewhere"] == "App on Pixel 7 (Android 14)")
+    check("app: me", mob.get("/api/v1/me", headers=B).json()["device"] == "App on Pixel 7 (Android 14)")
+    mob.post("/api/v1/logout", headers=B)
+    check("app: logout kills the token", mob.get("/api/v1/me", headers=B).status_code == 401)
+    check("app: version 404 until an APK is published", mob.get("/api/v1/app").status_code in (200, 404))
+    r = app.post("/api/v1/login", json={"email": "admin@example.com", "password": "admin-password-123"})
+    check("app: admin needs the code", r.status_code == 401 and r.json()["error"] == "code required")
+    st.post("/login", data={"email": "alice@example.com", "password": "alice-pass-123"}, headers=H)
+
     # expiry and disable
     with store.db() as c:
         c.execute("UPDATE enrollments SET expires_at = 1 WHERE course = 'linux_udemy'")

@@ -1,6 +1,7 @@
 """The web app: student pages, video access control and the admin area."""
 import collections
 import hmac
+import json
 import datetime as dt
 import os
 import threading
@@ -81,8 +82,13 @@ def client_ip(request):
 
 # --- sessions ---------------------------------------------------------------------
 def current(request, stage="ok"):
-    """(session, user) for a valid session cookie at the given stage, else (None, None)."""
-    tok = request.cookies.get(COOKIE)
+    """(session, user) for a valid session cookie (website) or bearer token (Android app), else (None, None)."""
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Bearer "):
+        tok = auth[7:].strip()
+        request.state.bearer = True     # no cookie involved: CSRF checks don't apply
+    else:
+        tok = request.cookies.get(COOKIE)
     if not tok:
         return None, None
     with store.db() as c:
@@ -102,7 +108,15 @@ def device_of(request):
     return guard.device_name(request.headers.get("user-agent", ""))
 
 
-def start_session(request, response, user, stage, seconds):
+def api_checked(request, s):
+    """JSON POSTs: the app (bearer token) needs nothing more; the website needs Origin + CSRF header."""
+    if getattr(request.state, "bearer", False):
+        return True
+    return same_origin(request) and hmac.compare_digest(request.headers.get("x-csrf-token", ""), s["csrf"])
+
+
+def new_session(request, user, stage, seconds):
+    """Create a session; returns its token (cookie value for the website, bearer token for the app)."""
     tok = security.new_token()
     th, ip, dev = security.token_hash(tok), client_ip(request), device_of(request)
     with store.db() as c:
@@ -113,6 +127,11 @@ def start_session(request, response, user, stage, seconds):
         if stage == "ok" and not user["is_admin"]:
             guard.log(c, user["id"], "login", ip, dev)
             guard.enforce_device_limit(c, user["id"], th)
+    return tok
+
+
+def start_session(request, response, user, stage, seconds):
+    tok = new_session(request, user, stage, seconds)
     response.set_cookie(COOKIE, tok, max_age=seconds, httponly=True, secure=config.COOKIE_SECURE,
                         samesite="lax", path="/")
 
@@ -350,7 +369,7 @@ async def progress_api(request: Request):
     s, u = current(request)
     if not u:
         return JSONResponse({"error": "login"}, 401)
-    if not (same_origin(request) and hmac.compare_digest(request.headers.get("x-csrf-token", ""), s["csrf"])):
+    if not api_checked(request, s):
         return JSONResponse({"error": "csrf"}, 403)
     data = await request.json()
     slug, lid = str(data.get("course", "")), str(data.get("lesson", ""))
@@ -396,7 +415,7 @@ async def play_api(request: Request):
         with store.db() as c:
             other = guard.playing_elsewhere(c, u["id"], s["token_hash"])
         return JSONResponse({"elsewhere": other["device"] if other else None})
-    if not (same_origin(request) and hmac.compare_digest(request.headers.get("x-csrf-token", ""), s["csrf"])):
+    if not api_checked(request, s):
         return JSONResponse({"error": "csrf"}, 403)
     if u["is_admin"]:
         return JSONResponse({"ok": True})
@@ -669,6 +688,18 @@ async def health(request):
     return Response("ok")
 
 
+async def android_page(request: Request):
+    """Public page with the APK download and install steps."""
+    s, u = current(request)
+    from . import api
+    try:
+        with open(os.path.join(api.APK_DIR, "version.json"), encoding="utf-8") as f:
+            v = json.load(f)
+    except (OSError, ValueError):
+        v = None
+    return render(request, "android.html", user=u, session=s, v=v)
+
+
 routes = [
     Route("/", home),
     Route("/login", login, methods=["GET", "POST"]),
@@ -686,6 +717,7 @@ routes = [
     Route("/admin/user/{uid:int}", admin_user, methods=["GET", "POST"]),
     Route("/admin/courses", admin_courses),
     Route("/healthz", health),
+    Route("/android", android_page),
     Mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static"),
 ]
 
@@ -715,8 +747,9 @@ class SecurityHeaders:
 
 
 def create_app():
+    from . import api   # the app's JSON API (imports this module, hence the late import)
     store.init()
-    return Starlette(routes=routes, exception_handlers={HTTPException: not_found},
+    return Starlette(routes=api.routes + routes, exception_handlers={HTTPException: not_found},
                      middleware=[Middleware(SecurityHeaders)])
 
 

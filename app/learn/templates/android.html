@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Android app · {{ site_name }}{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<div class="card form">
+  <h1>{{ site_name }} for Android</h1>
+  {% if v %}
+  <p class="muted">Watch your courses in the app: smooth player, speed control, resume where you stopped.
+     Sign in with the same email and password as on this site.</p>
+  <a class="button primary" href="/static/app/{{ v.file }}" download>Download the app ({{ v.version_name }}, {{ (v.size or 0)|size }})</a>
+  <h3>Install</h3>
+  <ol class="small">
+    <li>Open the downloaded file on your Android phone (Android 8 or newer).</li>
+    <li>If Android asks, allow your browser to <em>install unknown apps</em>, then tap <em>Install</em>.</li>
+    <li>Open <strong>{{ site_name }}</strong> and sign in.</li>
+  </ol>
+  <p class="muted small">The app counts as one of your {{ max_devices }} devices. SHA-256 of the file:
+     <span class="mono">{{ v.sha256 }}</span></p>
+  {% else %}
+  <p class="muted">The Android app is coming soon.</p>
+  {% endif %}
+</div>
+{% endblock %}

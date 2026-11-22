@@ -22,6 +22,8 @@ student ──HTTPS──> VPS 187.126.22.239  nginx: learn.opcode-labs.com (own
 | `app/` | The web app (Python, Starlette, SQLite) |
 | `pi/` | Read-only media server for the Pi (`sudo bash pi/install.sh`) |
 | `vps/` | nginx site, service and installer for the VPS (`sudo bash vps/install.sh`) |
+| [android/README.md](android/README.md) | **Android app**: features, build, signing key, publishing updates |
+| `app/learn/api.py` | JSON API used by the Android app |
 | `tools/web-mp4.sh` | Convert videos to browser-friendly MP4 |
 | `tests/test_e2e.py` | End-to-end test (media server + app) |
 

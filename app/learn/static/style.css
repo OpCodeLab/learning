@@ -127,6 +127,7 @@ a.file { justify-content: flex-start; } a.file span { margin-left: auto; }
 .devices li { padding: 6px 0; border-bottom: 1px solid var(--line); list-style: none; }
 .devices { padding: 0; margin: 8px 0; }
 .signal { color: var(--warn); font-weight: 600; }
+.app-link { margin-top: 24px; text-align: center; }
 .player-main h1 { font-size: 1.35rem; margin: 14px 0 10px; }
 .nav-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 aside.outline { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow: auto; padding: 16px; }
