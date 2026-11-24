@@ -8,9 +8,11 @@
           01 Welcome.mp4        <- lesson
           01 Welcome.pdf        <- attachment of lesson 01 (same leading number)
           cheatsheet.pdf        <- section resource (no matching number)
+          01 Code on GitHub.url <- link (a Windows internet shortcut), same rules as files
         02 Shell basics/
           ...
 Videos lying directly in the course folder form one section, "Lessons".
+Links for the whole course go in course.yaml:  links: [{title: ..., url: https://...}]
 """
 import hashlib
 import json
@@ -29,6 +31,7 @@ VIDEO_EXT = {".mp4", ".m4v", ".webm"}
 PLAYABLE_WARN_EXT = {".mkv", ".avi", ".mov", ".wmv", ".flv", ".ts"}
 COVER_NAMES = {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}
 PARTIAL_EXT = {".tmp", ".part", ".crdownload", ".partial"}   # uploads still in progress
+LINK_EXT = {".url"}         # Windows internet shortcut: "[InternetShortcut]" then "URL=https://..."
 # "03 - Title", "03_Title", and "S1_L03_Title" (section 1, lesson 3): the lesson number is 3.
 _NUM = re.compile(r"^\s*(?:S\d+[\s._-]*L)?(\d+)[\s._\-)]*", re.I)
 
@@ -58,12 +61,49 @@ class File:
 
 
 @dataclass
+class Link:
+    title: str
+    url: str
+
+
+def safe_url(url):
+    """Only plain web links (no javascript:, file:, ...)."""
+    url = str(url or "").strip()
+    p = urllib.parse.urlsplit(url)
+    return url if p.scheme in ("http", "https") and p.netloc and len(url) <= 2000 else None
+
+
+def parse_url_file(data):
+    """URL= line of a .url file (bytes), or None."""
+    for line in data.decode("utf-8", "replace").splitlines():
+        if line.strip().lower().startswith("url="):
+            return safe_url(line.strip()[4:])
+    return None
+
+
+def course_links(meta, warnings):
+    """course.yaml links: a list of {title, url}, or a mapping title: url."""
+    raw = meta.get("links") or []
+    items = raw.items() if isinstance(raw, dict) else [
+        ((x.get("title"), x.get("url")) if isinstance(x, dict) else (None, None)) for x in (raw if isinstance(raw, list) else [])]
+    out = []
+    for title, url in items:
+        u = safe_url(url)
+        if u:
+            out.append(Link(str(title or u), u))
+        else:
+            warnings.append("course.yaml links: %r is not an http(s) link" % (url,))
+    return out
+
+
+@dataclass
 class Lesson:
     file: File
     title: str
     number: int | None
     section: str
     attachments: list = field(default_factory=list)
+    links: list = field(default_factory=list)
     index: int = 0               # position in the whole course (0-based)
     duration: float | None = None    # seconds, from the MP4 header (durations.py)
     unreadable: bool = False         # the MP4 header couldn't be read (broken upload?)
@@ -83,6 +123,7 @@ class Section:
     title: str
     lessons: list = field(default_factory=list)
     resources: list = field(default_factory=list)
+    links: list = field(default_factory=list)
 
 
 @dataclass
@@ -93,6 +134,7 @@ class Course:
     sections: list
     cover: File | None
     warnings: list
+    links: list = field(default_factory=list)
 
     @property
     def lessons(self):
@@ -142,8 +184,9 @@ def split_title(name):
     return int(m.group(1)), tidy(rest) if rest else stem.strip()
 
 
-def build(slug, meta, files):
-    """Turn a flat file list (from /tree) into a Course."""
+def build(slug, meta, files, urls=None):
+    """Turn a flat file list (from /tree) into a Course. urls: {path of a .url file: its link}."""
+    urls = urls or {}
     files = [File(f["path"], f["size"], f["mtime"]) for f in files]
     warnings = []
     titles = meta.get("titles") if isinstance(meta.get("titles"), dict) else {}
@@ -181,14 +224,20 @@ def build(slug, meta, files):
             if num is not None:
                 by_num.setdefault(num, les)
         for o in others:
-            num, _ = split_title(o.name)
+            num, t = split_title(o.name)
+            if o.ext in LINK_EXT:
+                if not urls.get(o.path):
+                    warnings.append("%s: no http(s) URL= line in this link file" % o.path)
+                    continue
+                (by_num[num].links if num in by_num else sec.links).append(Link(t, urls[o.path]))
+                continue
             (by_num[num].attachments if num in by_num else sec.resources).append(o)
-        if sec.lessons or sec.resources:
+        if sec.lessons or sec.resources or sec.links:
             sections.append(sec)
 
     course = Course(slug=slug, title=str(meta.get("title") or slug.replace("_", " ").title()),
                     description=str(meta.get("description") or ""), sections=sections,
-                    cover=cover, warnings=warnings)
+                    cover=cover, warnings=warnings, links=course_links(meta, warnings))
     for i, les in enumerate(course.lessons):
         les.index = i
     if not course.lessons:
@@ -245,7 +294,11 @@ def course(slug, refresh=False):
             meta = None
         if not isinstance(meta, dict):
             meta, bad = {}, True
-        c = build(slug, meta, tree["files"])
+        urls = {}
+        for f in tree["files"]:   # link files are tiny: read them (skip anything big)
+            if f["path"].lower().endswith(tuple(LINK_EXT)) and f["size"] <= 4096:
+                urls[f["path"]] = parse_url_file(_get("/raw/%s/%s" % (q, urllib.parse.quote(f["path"])), raw=True))
+        c = build(slug, meta, tree["files"], urls)
         if bad:
             c.warnings.append("course.yaml is not valid YAML (title: / description:): using the folder name")
         try:

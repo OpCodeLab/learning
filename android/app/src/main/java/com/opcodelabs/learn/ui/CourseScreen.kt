@@ -101,6 +101,7 @@ fun CourseScreen(api: Api, slug: String, onBack: () -> Unit, onPlay: (String) ->
                                 }
                                 if (!closed) {
                                     s.lessons.forEach { l -> LessonRow(l, current = false) { onPlay(l.id) } }
+                                    if (s.links.isNotEmpty()) LinkList(s.links, "Links")
                                     if (s.resources.isNotEmpty()) AttachmentList(api, c.slug, s.resources, "Resources")
                                 }
                             }
@@ -120,6 +121,7 @@ private fun Header(api: Api, c: Course, onPlay: (String) -> Unit) {
         Text(c.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         if (c.description.isNotBlank()) Text(c.description.trim(), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (c.links.isNotEmpty()) LinkList(c.links, "Links")
         LinearProgressIndicator({ c.pct / 100f }, Modifier.fillMaxWidth(), drawStopIndicator = {})
         Text("${c.done} / ${c.lessons} lessons done · ${c.pct}%", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)

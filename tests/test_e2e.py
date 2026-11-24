@@ -26,7 +26,12 @@ def make(path, data=b""):
 
 
 VIDEO = bytes(range(256)) * 4096          # 1 MiB of known bytes
-make("linux_udemy/course.yaml", "title: Linux from scratch\ndescription: Shell, files, processes.\n".encode())
+make("linux_udemy/course.yaml", ("title: Linux from scratch\ndescription: Shell, files, processes.\n"
+                                  "links:\n  - title: Course code\n    url: https://github.com/OpCodeLab/linux-course\n"
+                                  "  - title: Bad\n    url: javascript:alert(1)\n").encode())
+make("linux_udemy/01 Getting started/01 Code on GitHub.url", b"[InternetShortcut]\r\nURL=https://github.com/OpCodeLab/lesson1\r\n")
+make("linux_udemy/01 Getting started/Man pages.url", b"[InternetShortcut]\nURL=https://man7.org/linux/man-pages/\n")
+make("linux_udemy/01 Getting started/02 Evil.url", b"[InternetShortcut]\nURL=javascript:alert(1)\n")
 make("linux_udemy/01 Getting started/01 Welcome.mp4", VIDEO)
 make("linux_udemy/01 Getting started/01 Welcome.pdf", b"%PDF-1.4 welcome")
 make("linux_udemy/01 Getting started/02 - Install Ubuntu.mp4", VIDEO[:1000])
@@ -158,6 +163,11 @@ try:
           and "Pipes" in r.text and "cheatsheet.txt" in r.text)
     check("unplayable .mkv hidden from students", "Redirection" not in r.text)
     check("unfinished uploads (.tmp) hidden", "upload-chunk" not in r.text)
+    check("lesson link from a .url file",
+          'href="https://github.com/OpCodeLab/lesson1" target="_blank" rel="noopener noreferrer">Code on GitHub' in r.text)
+    check("section link (no number) and course link from course.yaml",
+          ">Man pages <" in r.text and 'href="https://github.com/OpCodeLab/linux-course"' in r.text)
+    check("non-web links refused", "javascript:" not in r.text and ".url" not in r.text)
     check("lessons numbered like Udemy", "1. Welcome" in r.text and "10. Pipes" in r.text)
     lids = list(dict.fromkeys(re.findall(r'<a href="/course/linux_udemy/([0-9a-f]{12})"', r.text)))
     first = lids[0]
@@ -287,6 +297,10 @@ try:
     check("app: course JSON with sections, lessons, attachments, watermark",
           j["title"] == "Linux from scratch" and len(j["sections"]) == 2 and j["watermark"] == "alice@example.com"
           and j["sections"][0]["lessons"][0]["attachments"][0]["name"] == "01 Welcome.pdf", r.text[:300])
+    check("app: links in course JSON",
+          j["links"] == [{"title": "Course code", "url": "https://github.com/OpCodeLab/linux-course"}]
+          and j["sections"][0]["lessons"][0]["links"][0]["url"] == "https://github.com/OpCodeLab/lesson1"
+          and j["sections"][0]["links"][0]["title"] == "Man pages", str(j.get("links")))
     check("app: other course -> 404", mob.get("/api/v1/courses/rtos_record", headers=B).status_code == 404)
     r = mob.get("/media/linux_udemy/" + first, headers=dict(B, Range="bytes=0-9"))
     check("app: video with bearer token", r.status_code == 206 and r.content == VIDEO[:10])

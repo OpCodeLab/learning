@@ -2,6 +2,7 @@ package com.opcodelabs.learn.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +35,35 @@ import androidx.core.content.FileProvider
 import com.opcodelabs.learn.data.Api
 import com.opcodelabs.learn.data.ApiException
 import com.opcodelabs.learn.data.Attachment
+import com.opcodelabs.learn.data.Link
 import kotlinx.coroutines.launch
+
+/** Web links (GitHub repo, docs...): open in the phone's browser. */
+@Composable
+fun LinkList(links: List<Link>, title: String) {
+    val ctx = LocalContext.current
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        links.forEach { k ->
+            Row(Modifier.fillMaxWidth().clickable {
+                try {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(k.url)))
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(ctx, "No browser on this phone", Toast.LENGTH_LONG).show()
+                }
+            }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Link, null, tint = MaterialTheme.colorScheme.tertiary)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(k.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(Uri.parse(k.url).host ?: k.url, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, "Open", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
 
 /** Downloads a lesson file into the app cache, then opens it with a viewer app (PDF reader...). */
 @Composable

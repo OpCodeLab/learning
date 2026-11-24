@@ -60,6 +60,34 @@ bash ~/opcode_learn/tools/check-videos.sh /srv/drive/data/Training_Opcode/linux_
 For each video it prints `OK`, or why not: `BROKEN` (an unfinished or damaged upload: upload it again), the
 wrong codec, an index at the end of the file (slow start), or a bitrate too high for the home uplink.
 
+## Links (GitHub repo, docs...)
+Students see links in the **Resources** tab under the video (and in the app). They open in a new tab.
+
+**For the whole course:** add them to `course.yaml`:
+```yaml
+links:
+  - title: Course code on GitHub
+    url: https://github.com/OpCodeLab/linux-course
+  - title: Linux man pages
+    url: https://man7.org/linux/man-pages/
+```
+
+**For one lesson or one section:** put a link file (`.url`) in the section folder. Same rule as other
+files: starting with a lesson's number, it belongs to that lesson; any other name, to the whole section.
+The title is the file name.
+```
+S4_L21_Linux-time-....mp4
+S4_L21_Code on GitHub.url     -> lesson 21 only
+Section 4 docs.url            -> all lessons of section 4
+```
+To make one on Windows: drag the address bar's padlock from your browser onto the desktop (that
+creates a `.url` file), rename it, then upload it. Or create a text file named `xxx.url` containing:
+```
+[InternetShortcut]
+URL=https://github.com/OpCodeLab/linux-course
+```
+Only `http(s)://` links are shown; anything else gets a warning on **Courses** (admin).
+
 ## Lesson lengths
 The site shows each lesson's length ("▶ 9 min") and each section's total, like Udemy. It reads them
 from the video file's header (a few KB per file, over the Pi link) the first time it sees a file, and

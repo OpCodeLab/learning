@@ -39,7 +39,7 @@
 
       <div class="tabs" role="tablist">
         <button type="button" role="tab" class="tab" id="t-overview" aria-controls="p-overview" aria-selected="true">Overview</button>
-        <button type="button" role="tab" class="tab" id="t-files" aria-controls="p-files" aria-selected="false">Files{% if files %} ({{ files|length }}){% endif %}</button>
+        <button type="button" role="tab" class="tab" id="t-files" aria-controls="p-files" aria-selected="false">Resources{% if files %} ({{ files }}){% endif %}</button>
       </div>
       <section class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="t-overview">
         <h2>{{ course.title }}</h2>
@@ -50,17 +50,27 @@
           <div><dt>Your progress</dt><dd id="cpct">{{ pct }}%</dd></div>
         </dl>
         {% if course.description %}<p class="desc">{{ course.description }}</p>{% endif %}
+        {% if course.links %}
+        <h3>Links</h3>
+        {% for k in course.links %}<a class="file link" href="{{ k.url }}" target="_blank" rel="noopener noreferrer">{{ k.title }} <span class="muted small">{{ k.url|host }}</span></a>{% endfor %}
+        {% endif %}
       </section>
       <section class="tabpanel" id="p-files" role="tabpanel" aria-labelledby="t-files" hidden>
-        {% if lesson.attachments %}
+        {% if lesson.attachments or lesson.links %}
         <h3>This lesson</h3>
+        {% for k in lesson.links %}<a class="file link" href="{{ k.url }}" target="_blank" rel="noopener noreferrer">{{ k.title }} <span class="muted small">{{ k.url|host }}</span></a>{% endfor %}
         {% for f in lesson.attachments %}<a class="file" href="/media/{{ course.slug }}/{{ f.id }}">{{ f.name }} <span class="muted small">{{ f.size|size }}</span></a>{% endfor %}
         {% endif %}
-        {% if section and section.resources %}
+        {% if section and (section.resources or section.links) %}
         <h3>{{ section.title }}</h3>
+        {% for k in section.links %}<a class="file link" href="{{ k.url }}" target="_blank" rel="noopener noreferrer">{{ k.title }} <span class="muted small">{{ k.url|host }}</span></a>{% endfor %}
         {% for f in section.resources %}<a class="file" href="/media/{{ course.slug }}/{{ f.id }}">{{ f.name }} <span class="muted small">{{ f.size|size }}</span></a>{% endfor %}
         {% endif %}
-        {% if not files %}<p class="muted">No files for this lesson.</p>{% endif %}
+        {% if course.links %}
+        <h3>Whole course</h3>
+        {% for k in course.links %}<a class="file link" href="{{ k.url }}" target="_blank" rel="noopener noreferrer">{{ k.title }} <span class="muted small">{{ k.url|host }}</span></a>{% endfor %}
+        {% endif %}
+        {% if not files %}<p class="muted">No files or links for this lesson.</p>{% endif %}
       </section>
     </div>
   </div>
@@ -83,6 +93,7 @@
             <span class="meta">
               {% if l.duration %}<span>▶ {{ l.duration|dur }}</span>{% endif %}
               {% if l.attachments %}<span>{{ l.attachments|length }} file{{ 's' if l.attachments|length > 1 }}</span>{% endif %}
+              {% if l.links %}<span>{{ l.links|length }} link{{ 's' if l.links|length > 1 }}</span>{% endif %}
             </span>
           </a>
         </li>

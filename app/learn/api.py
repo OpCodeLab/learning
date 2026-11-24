@@ -31,6 +31,10 @@ def file_json(f):
     return {"id": f.id, "name": f.name, "size": f.size}
 
 
+def link_json(k):
+    return {"title": k.title, "url": k.url}
+
+
 async def login(request: Request):
     """{"email", "password", "code"?} -> {"token", "user"}. Admins also send their TOTP code."""
     try:
@@ -130,7 +134,8 @@ async def course(request: Request):
                 "completed": bool(p and p["completed"]),
                 "position": (p["position"] if p and not p["completed"] else 0),
                 "duration": (p["duration"] if p else 0),
-                "attachments": [file_json(f) for f in l.attachments]}
+                "attachments": [file_json(f) for f in l.attachments],
+                "links": [link_json(k) for k in l.links]}
 
     return JSONResponse({
         "slug": slug, "title": crs.title, "description": crs.description,
@@ -139,7 +144,9 @@ async def course(request: Request):
         "length": crs.total_duration or None,
         "watermark": None if u["is_admin"] else u["email"],
         "sections": [{"title": sec.title, "lessons": [lesson_json(l) for l in sec.lessons],
-                      "resources": [file_json(f) for f in sec.resources]} for sec in crs.sections],
+                      "resources": [file_json(f) for f in sec.resources],
+                      "links": [link_json(k) for k in sec.links]} for sec in crs.sections],
+        "links": [link_json(k) for k in crs.links],
     })
 
 

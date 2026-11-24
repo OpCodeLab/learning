@@ -151,6 +151,7 @@ a.file { display: flex; justify-content: flex-start; gap: 12px; padding: 9px 12p
   border-radius: 2px; margin: 6px 0; color: var(--text); text-decoration: none; }
 a.file:hover { border-color: var(--gold); background: var(--hover); }
 a.file::before { content: "⤓"; color: var(--gold-deep); font-weight: 700; }
+a.file.link::before { content: "↗"; }
 a.file span { margin-left: auto; }
 
 /* player page (Udemy-like): video edge to edge, course content on the right */

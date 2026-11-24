@@ -256,9 +256,13 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
                         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
                 }
+                if (lesson != null && lesson.links.isNotEmpty()) item { LinkList(lesson.links, "Links for this lesson") }
                 if (lesson != null && lesson.attachments.isNotEmpty()) item {
                     AttachmentList(api, slug, lesson.attachments, "Files for this lesson")
                 }
+                val sec = c.sectionOf(currentId)
+                if (sec != null && sec.links.isNotEmpty()) item { LinkList(sec.links, "Links for this section") }
+                if (c.links.isNotEmpty()) item { LinkList(c.links, "Course links") }
                 item { HorizontalDivider() }
                 c.sections.forEach { s ->
                     item {

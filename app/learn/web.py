@@ -44,6 +44,7 @@ templates.env.filters["datetime"] = lambda ts: dt.datetime.fromtimestamp(ts).str
 templates.env.filters["isodate"] = lambda ts: dt.date.fromtimestamp(ts).isoformat() if ts else ""
 templates.env.filters["size"] = fmt_size
 templates.env.filters["dur"] = durations.fmt
+templates.env.filters["host"] = lambda u: urllib.parse.urlsplit(u).netloc
 templates.env.filters["total"] = durations.fmt_total
 
 
@@ -377,7 +378,8 @@ async def lesson_page(request: Request):
                      current=any(l.id == lesson.id for l in sec.lessons))
                 for sec in course.sections]
     section = next((x["s"] for x in sections if x["current"]), None)
-    files = list(lesson.attachments) + list(section.resources if section else [])
+    files = (len(lesson.attachments) + len(lesson.links) + len(course.links)
+             + (len(section.resources) + len(section.links) if section else 0))
     return render(request, "lesson.html", user=u, session=s, course=course, lesson=lesson, pm=pm,
                   done_ids=done_ids, done=done, total=total, pct=pct, prev=prev, next=nxt, start=start,
                   sections=sections, section=section, files=files)
