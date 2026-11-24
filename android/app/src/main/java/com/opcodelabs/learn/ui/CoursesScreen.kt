@@ -50,6 +50,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -117,11 +124,7 @@ fun CoursesScreen(api: Api, email: String, onOpen: (String) -> Unit, onSignedOut
                     horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     update?.let { v ->
                         item(span = { GridItemSpan(maxLineSpan) }) {
-                            Banner("A new version (${v.version_name}) is available. Tap to download.")
-                            TextButton({ ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(v.url))) },
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)) {
-                                Text("Download the update")
-                            }
+                            UpdateBanner(v.version_name) { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(v.url))) }
                         }
                     }
                     if (list.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -150,6 +153,23 @@ private fun CourseCardView(api: Api, c: CourseCard, onClick: () -> Unit) {
             val until = c.expires?.let { " · until " + DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it * 1000)) } ?: ""
             Text("${c.done} / ${c.lessons} lessons · ${c.pct}%$until", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** "New version" notice: one band (gold edge), the text on the left and the Update button on the right. */
+@Composable
+private fun UpdateBanner(version: String, onUpdate: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(MaterialTheme.colorScheme.primaryContainer)
+        .clickable(onClick = onUpdate), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(4.dp).fillMaxHeight().background(Gold))
+        Column(Modifier.weight(1f).padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text("New version available", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text("OpCode Learn $version", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Button(onUpdate, Modifier.padding(end = 12.dp), shape = RoundedCornerShape(2.dp)) {
+            Text("UPDATE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
     }
 }
