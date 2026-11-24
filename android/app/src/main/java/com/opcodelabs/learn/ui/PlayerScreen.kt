@@ -227,6 +227,8 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
         }
     }
 
+    // Surface: gives all text below the video the theme's text color (white in dark mode).
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
     when {
         c == null && error != null -> Box(Modifier.fillMaxSize()) { ErrorState(error!!, onBack) }
         landscape -> playerBox(Modifier.fillMaxSize())
@@ -266,13 +268,9 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
                 item { HorizontalDivider() }
                 c.sections.forEach { s ->
                     item {
-                        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = 16.dp, vertical = 10.dp)) {
-                            Text(s.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            val len = totalLength(s.lessons.sumOf { it.length ?: 0.0 })
-                            Text("${s.lessons.count { it.completed }} / ${s.lessons.size}" + (len?.let { " · $it" } ?: ""),
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        val len = totalLength(s.lessons.sumOf { it.length ?: 0.0 })
+                        SectionHeader(s.title, "${s.lessons.count { it.completed }} / ${s.lessons.size} done" +
+                            (len?.let { " · $it" } ?: ""))
                     }
                     items(s.lessons, key = { it.id }) { l ->
                         LessonRow(l, current = l.id == currentId) {
@@ -283,6 +281,7 @@ fun PlayerScreen(api: Api, slug: String, startLessonId: String, onBack: () -> Un
                 }
             }
         }
+    }
     }
 }
 

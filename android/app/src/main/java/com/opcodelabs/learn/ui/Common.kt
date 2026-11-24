@@ -6,6 +6,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -64,6 +70,20 @@ fun totalLength(seconds: Double): String? {
     if (seconds <= 0) return null
     val m = maxOf(1, Math.round(seconds / 60).toInt())
     return if (m >= 60) "${m / 60} h ${m % 60} min" else "$m min"
+}
+
+/** Section title in the lesson lists: gold-tinted band with a gold edge, clear in light and dark mode. */
+@Composable
+fun SectionHeader(title: String, sub: String) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(MaterialTheme.colorScheme.primaryContainer)) {
+        Box(Modifier.width(4.dp).fillMaxHeight().background(Gold))
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface)
+            Text(sub, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.tertiary)
+        }
+    }
 }
 
 @Composable
