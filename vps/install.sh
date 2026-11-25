@@ -102,7 +102,12 @@ fi
 
 step "nginx site"
 install -d -m 755 /var/www/letsencrypt
-rm -rf /var/cache/nginx/learn_media        # the old Pi video cache is not used any more
+rm -rf /var/cache/nginx/learn_media
+install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
+# Renewed certificates are used only after an nginx reload (harmless if another site has the same hook).
+printf '#!/bin/sh\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/opcode-reload-nginx.sh
+chmod 755 /etc/letsencrypt/renewal-hooks/deploy/opcode-reload-nginx.sh
+        # the old Pi video cache is not used any more
 apply_site() {
     install -m 644 "$1" /etc/nginx/sites-available/$DOMAIN
     ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/$DOMAIN
