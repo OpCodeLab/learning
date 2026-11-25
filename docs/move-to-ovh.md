@@ -40,7 +40,7 @@ Progress students save on the old server after step 3a is not carried over, so d
 
 a. On **Hostinger**, a consistent copy of the database:
 ```bash
-sudo sqlite3 /var/lib/opcode-learn/learn.sqlite ".backup /tmp/learn-move.sqlite"
+sudo python3 -c "import sqlite3; s = sqlite3.connect('/var/lib/opcode-learn/learn.sqlite'); d = sqlite3.connect('/tmp/learn-move.sqlite'); s.backup(d); d.close(); print('copy ok')"
 sudo chown mehdi /tmp/learn-move.sqlite && chmod 600 /tmp/learn-move.sqlite
 ```
 b. From the **PC**, copy it across, then delete the copy on Hostinger (it holds password hashes):
