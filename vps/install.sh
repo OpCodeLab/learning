@@ -41,6 +41,12 @@ id -nG www-data | grep -qw learn || usermod -aG learn www-data
 install -d -m 755 /srv/learn
 # Owner = the uploading account; group learn can read; setgid keeps new files in group learn.
 install -d -m 2750 -o "$OWNER" -g learn "$COURSES"
+# The uploader must be in group learn, so its uploads (rsync, Studio) can be given to that group.
+id -nG "$OWNER" | grep -qw learn || usermod -aG learn "$OWNER"
+# Repair what is already there: everything readable by the site (group learn), nothing for others.
+chgrp -R learn "$COURSES"
+find "$COURSES" -type d -exec chmod u+rwx,g+rx,g-w,o-rwx,g+s {} +
+find "$COURSES" -type f -exec chmod u+rw,g+r,g-w,o-rwx {} +
 echo "$COURSES  (upload as $OWNER, read by the site)"
 
 step "App files"

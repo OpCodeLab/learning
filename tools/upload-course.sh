@@ -23,4 +23,7 @@ rsync -rt --partial-dir=.rsync-partial --info=progress2,stats1 \
       --exclude='*.md' --exclude='desktop.ini' --exclude='Thumbs.db' --exclude='.*' \
       --exclude='*.tmp' --exclude='*.part' \
       "$@" "$SRC/" "$SERVER:/srv/learn/courses/$NAME/"
+# rsync doesn't keep the folder's group (learn) on new sub-folders: give everything to the site.
+ssh "$SERVER" "chgrp -R learn '/srv/learn/courses/$NAME' && find '/srv/learn/courses/$NAME' -type d -exec chmod 2750 {} + && find '/srv/learn/courses/$NAME' -type f -exec chmod 640 {} +" \
+    || echo "WARNING: could not set the group 'learn': run on the server: sudo bash ~/opcode_learn/vps/install.sh"
 echo "Done. The site picks up the changes within a minute (Courses page: 'Re-read the disk' to see them now)."
