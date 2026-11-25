@@ -5,9 +5,9 @@
   <h1>Courses</h1>
   <a class="button" href="/admin/courses?refresh=1">Re-read the disk</a>
 </div>
-<p class="muted">Courses are the folders in <span class="mono">DATA/Training_Opcode</span> that contain a
-  <span class="mono">course.yaml</span>. Upload with files.opcode-labs.com; the site re-reads the folders every minute.</p>
-{% if offline %}<p class="error">The Pi can't be reached: {{ offline }}</p>{% endif %}
+<p class="muted">Courses are the folders in <span class="mono">/srv/learn/courses</span> that contain a
+  <span class="mono">course.yaml</span>. Upload with <span class="mono">tools/upload-course.sh</span>; the site re-reads the folders every minute.</p>
+{% if offline %}<p class="error">The course files can't be read: {{ offline }}</p>{% endif %}
 
 {% for c in courses %}
 <div class="card">

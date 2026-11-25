@@ -1,14 +1,20 @@
 # Publishing a course
 
-You manage content with **files.opcode-labs.com**, the way you already do. The course site
-reads the folders and updates itself within a minute (or at once: Courses → *Re-read the disk*).
+Courses live on the course server's own disk (OVH VPS, `/srv/learn/courses`). Prepare a course
+folder on your PC, then upload it with one command (sends only new or changed files):
+```powershell
+wsl bash /mnt/d/opcode_learn/tools/upload-course.sh "/mnt/d/Training/linux/udemy" linux_udemy
+```
+The second word is the course's folder name on the server (letters, digits, `_`): keep it the same
+for later uploads, since progress is saved under it. The site reads the folders and updates itself
+within a minute (or at once: Courses → *Re-read the disk*). `*.md` notes are not uploaded.
 
 ## Folder layout
-Courses live in `DATA/Training_Opcode`. A folder becomes a course **only when it contains a
-`course.yaml`**, so other folders there (slides, archives) stay private.
+On the server, courses live in `/srv/learn/courses`. A folder becomes a course **only when it
+contains a `course.yaml`**, so other folders there stay private.
 
 ```
-DATA/Training_Opcode/
+/srv/learn/courses/
   linux_udemy/
     course.yaml                  title and description
     cover.jpg                    optional, 16:9 image for the course card
@@ -41,8 +47,8 @@ description: |
   Shell, files, permissions and processes, step by step.
   For beginners; no Linux experience needed.
 ```
-Both keys are optional (without `title`, the folder name is used). Create the file in
-files.opcode-labs.com with *New file*, or upload it.
+Both keys are optional (without `title`, the folder name is used). Edit it on your PC, then upload
+the course again (only the changed file is sent).
 
 To set a nicer title for some lessons, add `titles:` with the file name (with or without `.mp4`):
 ```yaml
@@ -53,9 +59,9 @@ titles:
 Put titles containing `:` in quotes.
 
 ## Check the videos
-On the Pi (read-only, takes a minute for a big course):
+On your PC before uploading (WSL, needs ffmpeg), or on the server (read-only, takes a minute):
 ```bash
-bash ~/opcode_learn/tools/check-videos.sh /srv/drive/data/Training_Opcode/linux_udemy
+bash /mnt/d/opcode_learn/tools/check-videos.sh "/mnt/d/Training/linux/udemy"
 ```
 For each video it prints `OK`, or why not: `BROKEN` (an unfinished or damaged upload: upload it again), the
 wrong codec, an index at the end of the file (slow start), or a bitrate too high for the home uplink.
@@ -103,12 +109,11 @@ To convert, or to fix a slow start (the index at the end of the file), use:
 ```bash
 bash tools/web-mp4.sh "03 Permissions.mkv"
 ```
-On the Pi the course folder is `/srv/drive/data/Training_Opcode`.
-
-**Size vs your home uplink.** Each viewer of a video that isn't cached on the VPS yet
-uses roughly the video's bitrate of your upload. 1080p screencasts at CRF 23 are typically
-1–3 Mbit/s, so they're fine. Avoid 20+ Mbit/s camera originals: convert them first.
+**Size.** The server has 1 Gbit/s, but students on mobile data need a modest bitrate:
+1080p screencasts at CRF 23 are typically 1–3 Mbit/s, which is fine. Avoid 20+ Mbit/s camera
+originals: convert them first (also saves disk space).
 
 ## Replacing a video
-Upload the new file under the same name. The site sees a new size and date, so the VPS
-cache treats it as a new file; the old cached copy expires by itself.
+Upload the course again with the new file under the same name; students get the new
+version at once. To remove a file or lesson, delete it on the server:
+`ssh ubuntu@178.32.39.41 rm "/srv/learn/courses/linux_udemy/Section 4 - .../old.mp4"`.

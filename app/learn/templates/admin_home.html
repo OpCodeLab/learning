@@ -5,7 +5,7 @@
   <h1>Students</h1>
   <a class="button primary" href="/admin/new">+ New student</a>
 </div>
-{% if courses is none %}<p class="error">The Pi can't be reached: course names may be missing below.</p>{% endif %}
+{% if courses is none %}<p class="error">The course files can't be read: course names may be missing below.</p>{% endif %}
 {% if not rows %}
 <div class="card empty"><p>No students yet.</p></div>
 {% else %}

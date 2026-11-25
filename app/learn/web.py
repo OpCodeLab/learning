@@ -506,9 +506,8 @@ async def media(request: Request):
     }
     raw_path = "/raw/" + urllib.parse.quote(slug + "/" + f.path)
     if not config.DEV_PROXY:
-        # nginx serves the bytes from its cache, or fetches them from the Pi in 2 MB slices.
-        # The version (mtime-size) makes a replaced file a new cache entry.
-        headers["X-Accel-Redirect"] = "/_pi%s?v=%d-%d" % (raw_path, f.mtime, f.size)
+        # nginx sends the file straight from the VPS disk (/srv/learn/courses), with seeking.
+        headers["X-Accel-Redirect"] = "/_media" + raw_path
         return Response(b"", headers=headers)
     req = urllib.request.Request(config.MEDIA_URL + raw_path)
     if request.headers.get("range"):

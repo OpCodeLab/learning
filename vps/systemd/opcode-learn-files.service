@@ -1,0 +1,36 @@
+[Unit]
+Description=OpCode Learn file lister (read-only, 127.0.0.1:8096, courses in /srv/learn/courses)
+After=network-online.target
+
+[Service]
+# Same small server the Pi used (pi/media_server.py): lists course folders and serves course.yaml
+# and link files to the app. Videos themselves are sent by nginx straight from the disk.
+User=learn
+Group=learn
+ExecStart=/usr/bin/python3 /opt/opcode-learn/media_server.py --root /srv/learn/courses --bind 127.0.0.1 --port 8096
+Restart=on-failure
+RestartSec=5
+MemoryMax=150M
+
+ProtectSystem=strict
+ReadOnlyPaths=/srv/learn/courses
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
