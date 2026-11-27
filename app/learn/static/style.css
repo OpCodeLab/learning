@@ -147,6 +147,21 @@ li.done .tick::after { content: ""; position: absolute; left: 4px; top: 1px; wid
 li.current a { background: var(--gold-soft); border-left-color: var(--gold); font-weight: 600; }
 ol.compact li a { padding: 6px 8px; font-size: .92rem; }
 .files { margin-top: 12px; }
+
+/* questions under the video */
+form.ask { margin-bottom: 22px; }
+form.ask label { display: block; font-weight: 600; margin-bottom: 6px; }
+form.ask textarea, textarea.wide { width: 100%; display: block; resize: vertical; min-height: 96px; }
+.ask-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 8px; }
+.q { border: 1px solid var(--line); border-left: 3px solid var(--gold); padding: 10px 14px; margin: 10px 0; background: var(--surface); }
+.qmeta { margin: 0 0 4px; display: flex; gap: 12px; align-items: baseline; }
+.qtime { font-weight: 600; font-variant-numeric: tabular-nums; }
+.qbody { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+.qanswer { border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 6px; }
+.qanswer .eyebrow { margin: 0; }
+.badge { display: inline-block; min-width: 18px; padding: 0 5px; background: var(--gold); color: #000; font-size: 12px;
+  font-weight: 700; text-align: center; line-height: 18px; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
 a.file { display: flex; justify-content: flex-start; gap: 12px; padding: 9px 12px; border: 1px solid var(--line);
   border-radius: 2px; margin: 6px 0; color: var(--text); text-decoration: none; }
 a.file:hover { border-color: var(--gold); background: var(--hover); }

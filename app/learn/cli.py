@@ -4,6 +4,7 @@
     sudo opcode-learn new-totp you@example.com       # lost phone: new TOTP key
     sudo opcode-learn set-password you@example.com   # forgotten admin password
     sudo opcode-learn list
+    sudo opcode-learn test-mail [to@example.com]     # check the email settings (default: the trainer)
 Passwords are typed at a hidden prompt, never on the command line.
 """
 import argparse
@@ -11,7 +12,7 @@ import getpass
 import sys
 import urllib.parse
 
-from . import config, security, store
+from . import config, mailer, security, store
 
 
 def ask_password():
@@ -39,8 +40,21 @@ def main(argv=None):
     for name in ("create-admin", "new-totp", "set-password"):
         sub.add_parser(name).add_argument("email")
     sub.add_parser("list")
+    sub.add_parser("test-mail").add_argument("to", nargs="?")
     a = ap.parse_args(argv)
     store.init()
+
+    if a.cmd == "test-mail":
+        from . import web
+        if not mailer.enabled():
+            sys.exit("Email is off: set LEARN_SMTP_HOST, LEARN_SMTP_USER, LEARN_SMTP_PASSWORD in /etc/opcode-learn/learn.env")
+        to = [a.to] if a.to else web.trainer_emails()
+        mailer.ASYNC = False
+        status = mailer.send(to, "Test from %s" % config.SITE_NAME,
+                             "This is a test email from %s (%s).\nIf you read this, email works.\n"
+                             % (config.SITE_NAME, config.BASE_URL))
+        print("%s via %s:%d as %s -> %s" % (", ".join(to), config.SMTP_HOST, config.SMTP_PORT, config.MAIL_FROM, status))
+        return 0 if status == "sent" else 1
 
     with store.db() as c:
         if a.cmd == "list":

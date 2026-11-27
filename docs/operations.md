@@ -17,6 +17,44 @@ All from the web admin (Students):
 | Delete | *Delete this account* (type the email). Progress is deleted too. Files never are. |
 | Suspect sharing (⚠ in the list) | the student's page → *Devices and sharing signals*: who, where, when. Then warn them, *Sign out everywhere*, *Password reset link*, or *Disable* |
 | Student locked out by the device limit | nothing to do: signing in again works, and the least recently used device is signed out |
+| Answer a student's question | **Questions** (the number = waiting) → open it → write the answer → *Send the answer*. It is emailed to the student and shown under the video |
+
+## Questions under the videos
+Students write a question in the **Questions** tab under any video. It is saved with the course, the
+lesson and the video time (where the student was when they started writing), then:
+1. You get an email with the question, a link that opens the video at that time, and a link to answer.
+2. You answer on the site (**Questions** in the menu). The answer is emailed to the student and shown
+   under the video, below their question. You can edit it later (with or without a new email).
+
+Each student can send 10 questions per hour (spam guard), up to 4000 characters each.
+Without email set up, everything still works on the site; only the emails are missing.
+
+## Email
+The site sends mail through an existing mailbox of yours (SMTP), for example
+`contact@opcode-labs.com`. Take the SMTP settings from your mail provider (for a Hostinger mailbox:
+`smtp.hostinger.com`, port 465). On the server:
+```bash
+sudo nano /etc/opcode-learn/learn.env
+```
+add these lines (your values; the password as is, no quotes):
+```
+LEARN_SMTP_HOST=smtp.hostinger.com
+LEARN_SMTP_PORT=465
+LEARN_SMTP_USER=contact@opcode-labs.com
+LEARN_SMTP_PASSWORD=the-mailbox-password
+LEARN_TRAINER_EMAIL=you@example.com
+```
+- `LEARN_SMTP_PORT`: 465 (TLS from the start) or 587 (STARTTLS), as your provider says.
+- `LEARN_TRAINER_EMAIL`: where new questions go (several: comma-separated). Without it: your admin account's email.
+- Optional `LEARN_MAIL_FROM`: the sender address, if it isn't the login (`LEARN_SMTP_USER`).
+
+Then:
+```bash
+sudo systemctl restart opcode-learn
+sudo opcode-learn test-mail                # sends a test to LEARN_TRAINER_EMAIL, prints "sent" or the error
+```
+The file is readable only by root and the app (`root:learn`, mode 640); re-running the installer keeps it.
+If a mail can't be sent, the question page says why (*email failed*) and has *Send the email again*.
 
 ## Status and logs
 | What | Where |
@@ -37,7 +75,7 @@ VPS$ `sudo bash ~/opcode_learn/vps/install.sh`. The database and config are kept
 For the Pi part: copy, then Pi$ `sudo bash ~/opcode_learn/pi/install.sh`.
 
 ## Backup
-Everything except the videos is in one small file, `/var/lib/opcode-learn/learn.sqlite` (accounts, access, progress):
+Everything except the videos is in one small file, `/var/lib/opcode-learn/learn.sqlite` (accounts, access, progress, questions):
 ```bash
 sudo sqlite3 /var/lib/opcode-learn/learn.sqlite ".backup /root/learn-$(date +%F).sqlite"
 ```

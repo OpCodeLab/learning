@@ -1,4 +1,4 @@
-"""SQLite storage: users, sessions, invites, enrollments, progress."""
+"""SQLite storage: users, sessions, invites, enrollments, progress, questions."""
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -70,6 +70,24 @@ CREATE TABLE IF NOT EXISTS durations (         -- video lengths read from the MP
     seconds     REAL,                       -- NULL = header unreadable
     PRIMARY KEY (course, path)
 );
+CREATE TABLE IF NOT EXISTS questions (         -- asked under a video, answered by the trainer
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course       TEXT NOT NULL,
+    lesson       TEXT NOT NULL,             -- path of the video inside the course folder
+    lesson_id    TEXT NOT NULL,
+    course_title TEXT NOT NULL DEFAULT '',  -- titles when asked (shown even if the files move)
+    lesson_title TEXT NOT NULL DEFAULT '',
+    position     REAL NOT NULL DEFAULT 0,   -- video time (s) when the question was asked
+    body         TEXT NOT NULL,
+    created_at   INTEGER NOT NULL,
+    trainer_mail TEXT NOT NULL DEFAULT '',  -- '' sending | sent | off | error: ...
+    answer       TEXT,
+    answered_at  INTEGER,
+    answer_mail  TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS questions_user ON questions (user_id, course, lesson);
+CREATE INDEX IF NOT EXISTS questions_open ON questions (answered_at, created_at);
 """
 
 
@@ -188,3 +206,45 @@ def purge_expired(c):
     c.execute("DELETE FROM sessions WHERE expires_at < ?", (t,))
     c.execute("DELETE FROM invites WHERE expires_at < ?", (t,))
     c.execute("DELETE FROM events WHERE at < ?", (t - 90 * 86400,))   # keep 90 days
+
+
+# --- questions -----------------------------------------------------------------
+def add_question(c, uid, course, lesson, lesson_id, course_title, lesson_title, position, body):
+    cur = c.execute(
+        "INSERT INTO questions (user_id, course, lesson, lesson_id, course_title, lesson_title, position, body, "
+        "created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, course, lesson, lesson_id, course_title, lesson_title, position, body, now()))
+    return cur.lastrowid
+
+
+def question(c, qid):
+    return c.execute("SELECT q.*, u.email, u.name FROM questions q JOIN users u ON u.id = q.user_id "
+                     "WHERE q.id = ?", (qid,)).fetchone()
+
+
+def my_questions(c, uid, course, lesson):
+    return c.execute("SELECT * FROM questions WHERE user_id = ? AND course = ? AND lesson = ? ORDER BY created_at DESC",
+                     (uid, course, lesson)).fetchall()
+
+
+def questions(c, which="open"):
+    where = {"open": "WHERE q.answered_at IS NULL", "answered": "WHERE q.answered_at IS NOT NULL"}.get(which, "")
+    order = "q.created_at ASC" if which == "open" else "q.created_at DESC"
+    return c.execute("SELECT q.*, u.email, u.name FROM questions q JOIN users u ON u.id = q.user_id %s ORDER BY %s"
+                     % (where, order)).fetchall()
+
+
+def open_question_count(c):
+    return c.execute("SELECT COUNT(*) FROM questions WHERE answered_at IS NULL").fetchone()[0]
+
+
+def recent_question_count(c, uid, seconds=3600):
+    return c.execute("SELECT COUNT(*) FROM questions WHERE user_id = ? AND created_at > ?",
+                     (uid, now() - seconds)).fetchone()[0]
+
+
+def set_question_mail(qid, column, status):
+    """Called from the mail thread: its own connection."""
+    assert column in ("trainer_mail", "answer_mail")
+    with db() as c:
+        c.execute("UPDATE questions SET %s = ? WHERE id = ?" % column, (status, qid))

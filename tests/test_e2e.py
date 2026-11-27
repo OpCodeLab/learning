@@ -59,10 +59,16 @@ for _ in range(50):
         time.sleep(0.1)
 
 os.environ.update(LEARN_DB=os.path.join(work, "learn.sqlite"), LEARN_MEDIA_URL="http://127.0.0.1:%d" % PORT,
-                  LEARN_BASE_URL="http://testserver", LEARN_DEV_PROXY="1", LEARN_COOKIE_SECURE="0")
+                  LEARN_BASE_URL="http://testserver", LEARN_DEV_PROXY="1", LEARN_COOKIE_SECURE="0",
+                  LEARN_SMTP_HOST="smtp.invalid", LEARN_SMTP_USER="learn@opcode.test",
+                  LEARN_TRAINER_EMAIL="trainer@opcode.test")
 sys.path.insert(0, os.path.join(ROOT, "app"))
 from starlette.testclient import TestClient  # noqa: E402
-from learn import security, store, web  # noqa: E402
+from learn import mailer, security, store, web  # noqa: E402
+
+sent = []   # emails, captured instead of sent
+mailer.ASYNC = False
+mailer.deliver = lambda msg: sent.append(msg)
 
 ok = True
 from learn.catalog import split_title  # noqa: E402
@@ -317,6 +323,64 @@ try:
     r = app.post("/api/v1/login", json={"email": "admin@example.com", "password": "admin-password-123"})
     check("app: admin needs the code", r.status_code == 401 and r.json()["error"] == "code required")
     st.post("/login", data={"email": "alice@example.com", "password": "alice-pass-123"}, headers=H)
+
+    # questions under the video
+    scsrf = csrf_of(st.get("/course/linux_udemy/" + first).text)
+    SH = dict(H, **{"X-CSRF-Token": scsrf})
+    r = st.get("/course/linux_udemy/" + first)
+    check("questions tab on the lesson page", 'id="ask"' in r.text and "Questions</button>" in r.text)
+    r = st.post("/api/questions", json={"course": "linux_udemy", "lesson": first, "position": 754.4,
+                                        "body": "Why fork?"}, headers=H)
+    check("question without csrf refused", r.status_code == 403)
+    r = st.post("/api/questions", json={"course": "rtos_record", "lesson": rtl, "body": "Not my course"}, headers=SH)
+    check("question on a course not enrolled refused", r.status_code == 403)
+    r = st.post("/api/questions", json={"course": "linux_udemy", "lesson": first, "body": "x" * 5000}, headers=SH)
+    check("too long question refused", r.status_code == 400)
+    sent.clear()
+    r = st.post("/api/questions", json={"course": "linux_udemy", "lesson": first, "position": 754.4,
+                                        "body": "Why does <b>fork</b> return twice?\nLine 2"}, headers=SH)
+    check("question saved", r.status_code == 200 and r.json()["question"]["at"] == "12:34", r.text)
+    qid = r.json()["question"]["id"]
+    m = sent[0] if sent else None
+    check("trainer emailed with lesson, time and link", m is not None and m["To"] == "trainer@opcode.test"
+          and "Welcome" in m["Subject"] and "\n" not in m["Subject"]
+          and "at 12:34" in m.get_content() and "/admin/questions/%d" % qid in m.get_content()
+          and "?t=754" in m.get_content(), m and m.get_content())
+    with store.db() as c:
+        check("trainer mail status stored", store.question(c, qid)["trainer_mail"] == "sent")
+    r = st.get("/course/linux_udemy/" + first)
+    check("student sees own question (escaped), waiting", "&lt;b&gt;fork&lt;/b&gt;" in r.text
+          and "Waiting for an answer" in r.text and "Questions (1)" in r.text)
+    check("?t= opens the video at that time", 'data-start="754.0"' in st.get("/course/linux_udemy/%s?t=754" % first).text)
+    r = app.get("/admin/questions")
+    check("admin inbox lists it, menu count", "Why does &lt;b&gt;fork" in r.text and 'class="badge">1<' in r.text)
+    check("student can't open the inbox", st.get("/admin/questions").status_code == 404)
+    acsrf = csrf_of(app.get("/admin/questions/%d" % qid).text)
+    sent.clear()
+    r = app.post("/admin/questions/%d" % qid, data={"csrf": acsrf, "action": "answer", "email": "1",
+                                                   "answer": "Because the process is copied."}, headers=H)
+    m = sent[0] if sent else None
+    check("answer emailed to the student", r.status_code == 200 and m is not None and m["To"] == "alice@example.com"
+          and "Because the process is copied." in m.get_content() and "> Why does <b>fork</b> return twice?" in m.get_content()
+          and "?t=754" in m.get_content(), m and m.get_content())
+    r = st.get("/course/linux_udemy/" + first)
+    check("student sees the answer under the video", "Because the process is copied." in r.text)
+    check("answered: inbox empty again", "No questions waiting" in app.get("/admin/questions").text)
+    sent.clear()
+    app.post("/admin/questions/%d" % qid, data={"csrf": acsrf, "action": "answer", "answer": "Edited."}, headers=H)
+    check("answer edited without email", not sent and "Edited." in st.get("/course/linux_udemy/" + first).text)
+    mailer.deliver = lambda msg: (_ for _ in ()).throw(OSError("connection refused"))
+    st.post("/api/questions", json={"course": "linux_udemy", "lesson": first, "position": 1, "body": "Mail down?"},
+            headers=SH)
+    r = app.get("/admin/questions")
+    check("failed email shown, question kept", "Mail down?" in r.text and "email failed" in r.text)
+    mailer.deliver = lambda msg: sent.append(msg)
+    for i in range(10):
+        r = st.post("/api/questions", json={"course": "linux_udemy", "lesson": first, "body": "flood %d" % i},
+                    headers=SH)
+    check("max 10 questions per hour", r.status_code == 429, r.status_code)
+    r = app.post("/admin/questions/%d" % qid, data={"csrf": acsrf, "action": "delete"}, headers=H)
+    check("admin deletes a question", r.status_code == 303 and "Edited." not in st.get("/course/linux_udemy/" + first).text)
 
     # expiry and disable
     with store.db() as c:

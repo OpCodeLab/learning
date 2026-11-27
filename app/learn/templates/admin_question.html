@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Question · {{ site_name }}{% endblock %}
+{% block content %}
+{% macro mailstate(m) %}{{ {'': 'sending…', 'sent': 'sent', 'off': 'not sent (email is not set up)', 'not sent': 'not sent (you chose no email)'}.get(m, m) }}{% endmacro %}
+<p><a href="/admin/questions">‹ Questions</a></p>
+<h1>Question from {{ q.name or q.email }}</h1>
+<div class="card">
+  <p class="small muted">{{ q.email }} · asked {{ q.created_at|datetime }}</p>
+  <p><b>{{ q.course_title }}</b> · {{ q.lesson_title }} ·
+     <a href="{{ link }}" target="_blank" rel="noopener">▶ watch at {{ q.position|clock }}</a></p>
+  <p class="qbody">{{ q.body }}</p>
+  <p class="small muted">Email to you: {{ mailstate(q.trainer_mail) }}</p>
+</div>
+
+{% if msg %}<p class="ok">{{ msg }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<form method="post" class="card form">
+  <input type="hidden" name="csrf" value="{{ session.csrf }}">
+  <input type="hidden" name="action" value="answer">
+  <label for="answer">{{ 'Your answer (you can edit it)' if q.answer else 'Your answer' }}</label>
+  <textarea id="answer" name="answer" rows="10" class="wide" required>{{ q.answer or '' }}</textarea>
+  <label class="check"><input type="checkbox" name="email" value="1" checked {% if not mail_on %}disabled{% endif %}>
+    Email the answer to {{ q.email }}{% if not mail_on %} (email not set up){% endif %}</label>
+  <button class="primary">{{ 'Save and send again' if q.answer else 'Send the answer' }}</button>
+</form>
+
+{% if q.answer %}
+<div class="card">
+  <p class="small muted">Answered {{ q.answered_at|datetime }} · email to the student: {{ mailstate(q.answer_mail) }}</p>
+  {% if q.answer_mail.startswith('error') %}
+  <form method="post" class="inline"><input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <button name="action" value="resend">Send the email again</button></form>
+  {% endif %}
+</div>
+{% endif %}
+
+<details class="danger-zone">
+  <summary>Delete this question</summary>
+  <form method="post"><input type="hidden" name="csrf" value="{{ session.csrf }}">
+    <p class="small">The student won't see it any more. This can't be undone.</p>
+    <button class="danger" name="action" value="delete">Delete</button></form>
+</details>
+{% endblock %}

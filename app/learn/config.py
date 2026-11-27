@@ -18,3 +18,15 @@ INVITE_DAYS = 14
 MIN_PASSWORD = 10
 CATALOG_TTL = 60          # seconds between re-reads of the course folders
 MAX_DEVICES = int(os.environ.get("LEARN_MAX_DEVICES", "2"))   # signed-in devices per student
+
+# Questions under the videos: students ask, the trainer answers by email (mailer.py).
+# Outgoing mail through an SMTP mailbox (e.g. contact@opcode-labs.com). Empty host = no email:
+# questions and answers are still stored and shown on the site.
+SMTP_HOST = os.environ.get("LEARN_SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("LEARN_SMTP_PORT", "465"))      # 465 = TLS from the start, 587 = STARTTLS
+SMTP_USER = os.environ.get("LEARN_SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("LEARN_SMTP_PASSWORD", "")
+MAIL_FROM = os.environ.get("LEARN_MAIL_FROM", "") or SMTP_USER
+TRAINER_EMAIL = os.environ.get("LEARN_TRAINER_EMAIL", "")   # empty = the admin accounts' emails
+QUESTION_MAX = 4000        # characters
+QUESTIONS_PER_HOUR = 10    # per student

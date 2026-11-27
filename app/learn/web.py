@@ -19,7 +19,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from . import catalog, config, durations, guard, security, store
+from . import catalog, config, durations, guard, mailer, security, store
 
 HERE = os.path.dirname(__file__)
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
@@ -46,6 +46,16 @@ templates.env.filters["size"] = fmt_size
 templates.env.filters["dur"] = durations.fmt
 templates.env.filters["host"] = lambda u: urllib.parse.urlsplit(u).netloc
 templates.env.filters["total"] = durations.fmt_total
+
+
+def fmt_clock(seconds):
+    """Video time: 754 -> '12:34', 3723 -> '1:02:03'."""
+    m, sec = divmod(int(seconds or 0), 60)
+    h, m = divmod(m, 60)
+    return "%d:%02d:%02d" % (h, m, sec) if h else "%d:%02d" % (m, sec)
+
+
+templates.env.filters["clock"] = fmt_clock
 
 
 # --- login throttling (in memory; restart clears it) ------------------------------
@@ -165,6 +175,10 @@ async def form_checked(request, session):
 
 
 def render(request, name, status=200, **ctx):
+    u = ctx.get("user")
+    if u and u["is_admin"] and "open_questions" not in ctx:   # the count in the admin menu
+        with store.db() as c:
+            ctx["open_questions"] = store.open_question_count(c)
     return templates.TemplateResponse(request, name, ctx, status_code=status)
 
 
@@ -372,6 +386,12 @@ async def lesson_page(request: Request):
     nxt = lessons[lesson.index + 1] if lesson.index + 1 < len(lessons) else None
     p = pm.get(lesson.file.path)
     start = p["position"] if p and not p["completed"] else 0
+    try:   # ?t=754: open at that time (links in the question emails)
+        start = max(0.0, float(request.query_params["t"]))
+    except (KeyError, ValueError):
+        pass
+    with store.db() as c:
+        asked = store.my_questions(c, u["id"], slug, lesson.file.path)
     done_ids = {l.id for l in lessons if pm.get(l.file.path) and pm[l.file.path]["completed"]}
     sections = [dict(s=sec, done=sum(1 for l in sec.lessons if l.id in done_ids),
                      length=sum(l.duration or 0 for l in sec.lessons),
@@ -382,7 +402,8 @@ async def lesson_page(request: Request):
              + (len(section.resources) + len(section.links) if section else 0))
     return render(request, "lesson.html", user=u, session=s, course=course, lesson=lesson, pm=pm,
                   done_ids=done_ids, done=done, total=total, pct=pct, prev=prev, next=nxt, start=start,
-                  sections=sections, section=section, files=files)
+                  sections=sections, section=section, files=files, asked=asked,
+                  question_max=config.QUESTION_MAX)
 
 
 async def complete_api(request: Request):
@@ -407,6 +428,85 @@ async def complete_api(request: Request):
         store.set_completed(c, u["id"], slug, lesson.file.path, bool(data.get("completed")))
         _, done, total, pct = course_progress(c, u["id"], course)
     return JSONResponse({"ok": True, "done": done, "total": total, "pct": pct})
+
+
+def lesson_url(slug, lesson_id, position=0):
+    return "%s/course/%s/%s%s" % (config.BASE_URL, slug, lesson_id, "?t=%d" % position if position >= 1 else "")
+
+
+def trainer_emails():
+    if config.TRAINER_EMAIL:
+        return [e.strip() for e in config.TRAINER_EMAIL.split(",") if e.strip()]
+    with store.db() as c:
+        return [r["email"] for r in c.execute("SELECT email FROM users WHERE is_admin = 1 AND disabled = 0")]
+
+
+def notify_trainer(qid):
+    with store.db() as c:
+        q = store.question(c, qid)
+    who = "%s <%s>" % (q["name"], q["email"]) if q["name"] else q["email"]
+    body = ("New question from %s\n\nCourse: %s\nLesson: %s, at %s in the video\n%s\n\n%s\n\n"
+            "Answer it here (the answer is emailed to the student):\n%s/admin/questions/%d\n"
+            % (who, q["course_title"], q["lesson_title"], fmt_clock(q["position"]),
+               lesson_url(q["course"], q["lesson_id"], q["position"]), q["body"], config.BASE_URL, qid))
+    mailer.send(trainer_emails(), "Question: %s (%s)" % (q["lesson_title"], q["email"]), body,
+                lambda status: store.set_question_mail(qid, "trainer_mail", status))
+
+
+def send_answer(qid):
+    with store.db() as c:
+        q = store.question(c, qid)
+    body = ("Hello%s,\n\nYou asked a question in \"%s\", lesson \"%s\" (at %s in the video):\n\n%s\n\n"
+            "Answer from your trainer:\n\n%s\n\nBack to the lesson: %s\n\n-- \n%s\n"
+            % (" " + q["name"] if q["name"] else "", q["course_title"], q["lesson_title"], fmt_clock(q["position"]),
+               "\n".join("> " + line for line in q["body"].splitlines()), q["answer"],
+               lesson_url(q["course"], q["lesson_id"], q["position"]), config.SITE_NAME))
+    mailer.send(q["email"], "Answer to your question: %s" % q["lesson_title"], body,
+                lambda status: store.set_question_mail(qid, "answer_mail", status))
+
+
+def question_json(q):
+    return {"id": q["id"], "position": q["position"], "at": fmt_clock(q["position"]), "body": q["body"],
+            "asked": fmt_date(q["created_at"]), "answer": q["answer"],
+            "answered": fmt_date(q["answered_at"]) if q["answered_at"] else None}
+
+
+async def question_api(request: Request):
+    """A student asks a question about the lesson, at the current video time."""
+    s, u = current(request)
+    if not u:
+        return JSONResponse({"error": "login"}, 401)
+    if not api_checked(request, s):
+        return JSONResponse({"error": "csrf"}, 403)
+    try:
+        data = await request.json()
+    except ValueError:
+        return JSONResponse({"error": "bad request"}, 400)
+    slug, lid = str(data.get("course", "")), str(data.get("lesson", ""))
+    body = str(data.get("body", "")).replace("\r\n", "\n").strip()
+    if not allowed(u, slug):
+        return JSONResponse({"error": "forbidden"}, 403)
+    if not 3 <= len(body) <= config.QUESTION_MAX:
+        return JSONResponse({"error": "Write between 3 and %d characters." % config.QUESTION_MAX}, 400)
+    try:
+        pos = max(0.0, float(data.get("position", 0)))
+    except (TypeError, ValueError):
+        pos = 0.0
+    try:
+        course = catalog.course(slug)
+    except catalog.Unavailable:
+        return JSONResponse({"error": "offline"}, 503)
+    lesson = course.lesson(lid) if course else None
+    if not lesson:
+        return JSONResponse({"error": "unknown lesson"}, 404)
+    with store.db() as c:
+        if not u["is_admin"] and store.recent_question_count(c, u["id"]) >= config.QUESTIONS_PER_HOUR:
+            return JSONResponse({"error": "Too many questions in the last hour. Please try again later."}, 429)
+        qid = store.add_question(c, u["id"], slug, lesson.file.path, lesson.id, course.title,
+                                 "%s. %s" % (lesson.num, lesson.title), pos, body)
+        q = store.question(c, qid)
+    notify_trainer(qid)
+    return JSONResponse({"ok": True, "question": question_json(q)})
 
 
 async def progress_api(request: Request):
@@ -700,6 +800,58 @@ async def admin_user(request: Request):
                   max_devices=config.MAX_DEVICES)
 
 
+async def admin_questions(request: Request):
+    s, u = need_admin(request)
+    which = request.query_params.get("show", "open")
+    which = which if which in ("open", "answered", "all") else "open"
+    with store.db() as c:
+        rows = store.questions(c, which)
+    return render(request, "admin_questions.html", user=u, session=s, rows=rows, which=which,
+                  mail_on=mailer.enabled())
+
+
+async def admin_question(request: Request):
+    s, u = need_admin(request)
+    qid = request.path_params["qid"]
+    with store.db() as c:
+        q = store.question(c, qid)
+    if not q:
+        raise HTTPException(404)
+    msg = error = None
+    if request.method == "POST":
+        form = await form_checked(request, s)
+        action = form.get("action")
+        if action == "answer":
+            answer = (form.get("answer") or "").replace("\r\n", "\n").strip()
+            if not answer:
+                error = "Write an answer first."
+            else:
+                with store.db() as c:
+                    c.execute("UPDATE questions SET answer = ?, answered_at = ?, answer_mail = ? WHERE id = ?",
+                              (answer, store.now(), "" if form.get("email") else "not sent", qid))
+                if not form.get("email"):
+                    msg = "Answer saved, no email sent. The student sees it under the video."
+                elif mailer.enabled():
+                    send_answer(qid)
+                    msg = "Answer saved and sent to %s." % q["email"]
+                else:
+                    send_answer(qid)   # records 'off'
+                    msg = "Answer saved. Email is not set up yet: the student sees it under the video."
+        elif action == "resend" and q["answer"]:
+            with store.db() as c:
+                c.execute("UPDATE questions SET answer_mail = '' WHERE id = ?", (qid,))
+            send_answer(qid)
+            msg = "Sending the answer again."
+        elif action == "delete":
+            with store.db() as c:
+                c.execute("DELETE FROM questions WHERE id = ?", (qid,))
+            return RedirectResponse("/admin/questions", 303)
+        with store.db() as c:
+            q = store.question(c, qid)
+    return render(request, "admin_question.html", 400 if error else 200, user=u, session=s, q=q, msg=msg,
+                  error=error, mail_on=mailer.enabled(), link=lesson_url(q["course"], q["lesson_id"], q["position"]))
+
+
 async def admin_courses(request: Request):
     s, u = need_admin(request)
     refresh = request.query_params.get("refresh") == "1"
@@ -756,10 +908,13 @@ routes = [
     Route("/api/progress", progress_api, methods=["POST"]),
     Route("/api/complete", complete_api, methods=["POST"]),
     Route("/api/play", play_api, methods=["GET", "POST"]),
+    Route("/api/questions", question_api, methods=["POST"]),
     Route("/admin", admin_home),
     Route("/admin/new", admin_new, methods=["GET", "POST"]),
     Route("/admin/user/{uid:int}", admin_user, methods=["GET", "POST"]),
     Route("/admin/courses", admin_courses),
+    Route("/admin/questions", admin_questions),
+    Route("/admin/questions/{qid:int}", admin_question, methods=["GET", "POST"]),
     Route("/healthz", health),
     Route("/android", android_page),
     Mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static"),

@@ -40,6 +40,7 @@
       <div class="tabs" role="tablist">
         <button type="button" role="tab" class="tab" id="t-overview" aria-controls="p-overview" aria-selected="true">Overview</button>
         <button type="button" role="tab" class="tab" id="t-files" aria-controls="p-files" aria-selected="false">Resources{% if files %} ({{ files }}){% endif %}</button>
+        <button type="button" role="tab" class="tab" id="t-qa" aria-controls="p-qa" aria-selected="false">Questions{% if asked %} ({{ asked|length }}){% endif %}</button>
       </div>
       <section class="tabpanel" id="p-overview" role="tabpanel" aria-labelledby="t-overview">
         <h2>{{ course.title }}</h2>
@@ -72,6 +73,31 @@
         {% endif %}
         {% if not files %}<p class="muted">No files or links for this lesson.</p>{% endif %}
       </section>
+      <section class="tabpanel" id="p-qa" role="tabpanel" aria-labelledby="t-qa" hidden>
+        <form class="ask" id="ask">
+          <label for="ask-body">Ask the trainer about this lesson</label>
+          <textarea id="ask-body" rows="4" maxlength="{{ question_max }}" required
+                    placeholder="Your question. Pause the video where it is about: the time is sent with it."></textarea>
+          <div class="ask-row">
+            <span class="muted small">At <b id="ask-at">0:00</b> in the video · the answer comes by email to {{ user.email }}</span>
+            <button class="primary" id="ask-send">Send question</button>
+          </div>
+          <p class="error" id="ask-error" hidden></p>
+          <p class="ok" id="ask-ok" hidden>Question sent. You'll get the answer by email, and it will appear here.</p>
+        </form>
+        <div id="qlist">
+          {% for q in asked %}
+          <article class="q">
+            <p class="qmeta"><a href="?t={{ q.position|int }}" class="qtime" data-t="{{ q.position }}">▶ {{ q.position|clock }}</a>
+              <span class="muted small">asked {{ q.created_at|date }}</span></p>
+            <p class="qbody">{{ q.body }}</p>
+            {% if q.answer %}
+            <div class="qanswer"><p class="eyebrow">Answer · {{ q.answered_at|date }}</p><p class="qbody">{{ q.answer }}</p></div>
+            {% else %}<p class="muted small">Waiting for an answer.</p>{% endif %}
+          </article>
+          {% endfor %}
+        </div>
+      </section>
     </div>
   </div>
 
@@ -103,5 +129,5 @@
     {% endif %}{% endfor %}
   </aside>
 </div>
-<script src="/static/player.js?v=3"></script>
+<script src="/static/player.js?v=4"></script>
 {% endblock %}

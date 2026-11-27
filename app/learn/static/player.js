@@ -140,7 +140,65 @@
   if (cur && cur.scrollIntoView) cur.scrollIntoView({block: "center"});
   window.scrollTo(0, 0);
 
-  // --- tabs under the video (Overview / Files) -------------------------------------------
+  // --- questions: sent with the video time when the student started writing -------------
+  var ask = document.getElementById("ask");
+  if (ask) {
+    var qtext = document.getElementById("ask-body"), qat = document.getElementById("ask-at");
+    var qerr = document.getElementById("ask-error"), qok = document.getElementById("ask-ok");
+    var qbtn = document.getElementById("ask-send"), pinned = null;
+    var clock = function (t) {
+      t = Math.floor(t || 0);
+      var h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
+      return (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (s < 10 ? "0" : "") + s;
+    };
+    var showAt = function () { qat.textContent = clock(pinned === null ? v.currentTime : pinned); };
+    v.addEventListener("timeupdate", function () { if (pinned === null) showAt(); });
+    qtext.addEventListener("input", function () {
+      if (pinned === null && qtext.value.trim()) { pinned = v.currentTime; showAt(); }
+      if (!qtext.value.trim()) { pinned = null; showAt(); }
+    });
+    document.getElementById("qlist").addEventListener("click", function (e) {
+      var a = e.target.closest(".qtime");
+      if (!a || !v.getAttribute("src")) return;
+      e.preventDefault();
+      v.currentTime = parseFloat(a.dataset.t) || 0;
+      window.scrollTo({top: 0, behavior: "smooth"});
+    });
+    ask.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var body = qtext.value.trim();
+      if (body.length < 3) return;
+      qbtn.disabled = true; qerr.hidden = true; qok.hidden = true;
+      var at = pinned === null ? v.currentTime : pinned;
+      fetch("/api/questions", {method: "POST", credentials: "same-origin", headers: H,
+                               body: JSON.stringify({course: d.course, lesson: d.lesson, position: at, body: body})})
+        .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, j: j}; }); })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.j.error || "not sent");
+          var q = res.j.question, art = document.createElement("article");
+          art.className = "q";
+          var meta = document.createElement("p"); meta.className = "qmeta";
+          var t = document.createElement("a"); t.className = "qtime"; t.href = "?t=" + Math.floor(q.position);
+          t.dataset.t = q.position; t.textContent = "▶ " + q.at;
+          var when = document.createElement("span"); when.className = "muted small"; when.textContent = "asked " + q.asked;
+          meta.appendChild(t); meta.appendChild(when);
+          var p = document.createElement("p"); p.className = "qbody"; p.textContent = q.body;
+          var w = document.createElement("p"); w.className = "muted small"; w.textContent = "Waiting for an answer.";
+          art.appendChild(meta); art.appendChild(p); art.appendChild(w);
+          var list = document.getElementById("qlist");
+          list.insertBefore(art, list.firstChild);
+          qtext.value = ""; pinned = null; showAt(); qok.hidden = false;
+        })
+        .catch(function (err) {
+          qerr.textContent = err.message === "csrf" || err.message === "login"
+            ? "Your session expired: copy your text, reload the page and send it again." : err.message;
+          qerr.hidden = false;
+        })
+        .then(function () { qbtn.disabled = false; });
+    });
+  }
+
+  // --- tabs under the video (Overview / Files / Questions) ----------------------------------
   var tabs = document.querySelectorAll(".tabs .tab");
   Array.prototype.forEach.call(tabs, function (t) {
     t.addEventListener("click", function () {

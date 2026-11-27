@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=6">
+<link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
 <header class="gbar">
@@ -21,8 +21,9 @@
     <nav class="usermenu">
       <a href="/"{% if request.url.path == '/' or request.url.path.startswith('/course') %} aria-current="page"{% endif %}>My courses</a>
       {% if user.is_admin %}
-      <a href="/admin"{% if request.url.path.startswith('/admin') and not request.url.path.startswith('/admin/courses') %} aria-current="page"{% endif %}>Students</a>
+      <a href="/admin"{% if request.url.path.startswith('/admin') and not request.url.path.startswith(('/admin/courses', '/admin/questions')) %} aria-current="page"{% endif %}>Students</a>
       <a href="/admin/courses"{% if request.url.path.startswith('/admin/courses') %} aria-current="page"{% endif %}>Courses</a>
+      <a href="/admin/questions"{% if request.url.path.startswith('/admin/questions') %} aria-current="page"{% endif %}>Questions{% if open_questions %} <span class="badge">{{ open_questions }}</span>{% endif %}</a>
       {% endif %}
       <a href="/account"{% if request.url.path == '/account' %} aria-current="page"{% endif %}>Account</a>
       <form method="post" action="/logout" class="inline">

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Questions · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="head-row">
+  <h1>Questions</h1>
+  <nav class="filters">
+    <a class="button{{ ' primary' if which == 'open' }}" href="/admin/questions">To answer</a>
+    <a class="button{{ ' primary' if which == 'answered' }}" href="/admin/questions?show=answered">Answered</a>
+    <a class="button{{ ' primary' if which == 'all' }}" href="/admin/questions?show=all">All</a>
+  </nav>
+</div>
+{% if not mail_on %}<p class="warn">Email is not set up yet: you won't get an email for new questions, and answers are
+only shown to the student under the video. Set it up in <code>/etc/opcode-learn/learn.env</code> (docs/operations.md, "Email").</p>{% endif %}
+{% if not rows %}
+<div class="card empty"><p>{{ 'No questions waiting for an answer.' if which == 'open' else 'No questions.' }}</p></div>
+{% else %}
+<div class="card table-wrap">
+<table>
+  <thead><tr><th>Asked</th><th>Student</th><th>Lesson</th><th>Question</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for q in rows %}
+  <tr>
+    <td class="small muted">{{ q.created_at|datetime }}</td>
+    <td>{{ q.email }}{% if q.name %}<br><span class="muted small">{{ q.name }}</span>{% endif %}</td>
+    <td class="small">{{ q.course_title }}<br>{{ q.lesson_title }} <span class="muted">at {{ q.position|clock }}</span></td>
+    <td><a href="/admin/questions/{{ q.id }}">{{ q.body|truncate(140) }}</a></td>
+    <td>{% if q.answered_at %}<span class="chip okc">answered</span>{% else %}<span class="chip">to answer</span>{% endif %}
+        {% if q.answer_mail.startswith('error') or q.trainer_mail.startswith('error') %}<br><span class="chip expired">email failed</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

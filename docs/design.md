@@ -97,3 +97,14 @@ tabs under the video. Ticking a box (`POST /api/complete`) marks a lesson done o
 doesn't move the resume point. Lengths come from `durations.py` (MP4 `moov/mvhd` header, read with Range
 requests, stored in the `durations` table). The Android app does the same: a course opens on its video,
 and the ⓘ button shows the course overview.
+
+## Questions
+A third tab under the video, **Questions**: `POST /api/questions` (same CSRF rules as progress) stores the
+question in the `questions` table with the lesson path, the course and lesson titles at that moment and the
+video time (taken when the student starts typing, so pausing to write doesn't change it). The page lists the
+student's own questions for that lesson with the answers; `?t=754` opens the video at 12:34.
+The trainer gets an email (`mailer.py`, SMTP over TLS, sent in a background thread so the page never waits);
+the admin page **Questions** lists them, unanswered first, and the answer form emails the student. Each mail's
+result (`sent`, `off`, `error: ...`) is stored on the question. Mail headers are built with `EmailMessage`
+(no header injection: one-line subjects); the text is plain, the student's text is quoted as is.
+Limits: 3 to 4000 characters, 10 questions per student per hour. Not in the Android app yet.
